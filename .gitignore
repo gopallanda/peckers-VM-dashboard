@@ -1,0 +1,16 @@
+# Secrets & sessions — NEVER commit these
+.env
+auth.json
+
+# Downloaded CSV exports and debug artifacts
+downloads/
+debug/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db

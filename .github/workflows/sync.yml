@@ -1,0 +1,74 @@
+name: VM Hub -> Supabase sync
+
+on:
+  schedule:
+    # Mondays 04:00 UTC
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Optional START_DATE (YYYY-MM-DD)'
+        required: false
+      end_date:
+        description: 'Optional END_DATE (YYYY-MM-DD)'
+        required: false
+      weeks_back:
+        description: 'WEEKS_BACK (ignored if start/end set)'
+        required: false
+        default: '4'
+
+concurrency:
+  group: vm-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: vm-extractor
+    env:
+      VM_HUB_URL: ${{ secrets.VM_HUB_URL }}
+      VM_HUB_EMAIL: ${{ secrets.VM_HUB_EMAIL }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      STORES: ${{ secrets.STORES }}
+      WEEKS_BACK: ${{ github.event.inputs.weeks_back || '4' }}
+      START_DATE: ${{ github.event.inputs.start_date }}
+      END_DATE: ${{ github.event.inputs.end_date }}
+      HEADLESS: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: vm-extractor/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore saved VM Hub session
+        # The session is saved once locally via `npm run auth` and stored as a
+        # repo secret. See README for how to create VM_AUTH_JSON.
+        run: |
+          printf '%s' "${{ secrets.VM_AUTH_JSON }}" > auth.json
+          test -s auth.json || (echo "auth.json is empty — set the VM_AUTH_JSON secret" && exit 1)
+
+      - name: Run sync
+        run: npm run sync
+
+      - name: Upload debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-sync-debug
+          path: |
+            vm-extractor/debug/
+            vm-extractor/downloads/
+          if-no-files-found: ignore
+          retention-days: 7
