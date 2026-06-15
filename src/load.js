@@ -11,8 +11,9 @@
  *  - Dynamic schema: one TEXT column per CSV column (so the loader is resilient
  *    to exact column names), plus metadata columns. Numeric casting happens in
  *    the KPI views, not here.
- *  - Idempotent: full-refresh per store each run — delete that store's rows,
- *    then insert. Re-running is safe.
+ *  - Idempotent: full-refresh per (store, week) each run — delete that store's
+ *    rows for the weeks being loaded, then insert. Re-running is safe and does
+ *    NOT disturb other weeks already synced for the store.
  */
 
 const { Pool } = require('pg');
@@ -109,10 +110,16 @@ async function ensureTable(client, table, columnMap) {
 }
 
 // ---------------------------------------------------------------------------
-// Full-refresh per store
+// Full-refresh per (store, week)
 // ---------------------------------------------------------------------------
-async function deleteStoreRows(client, table, store) {
-  const res = await client.query(`DELETE FROM ${quoteIdent(table)} WHERE store = $1`, [store]);
+// NOTE: refresh is scoped to the specific weeks captured this run, so weeks
+// previously synced for this store are left intact. (A blanket per-store delete
+// would clobber every other week whenever a single week is re-synced.)
+async function deleteStoreWeekRows(client, table, store, weekStart) {
+  const res = await client.query(
+    `DELETE FROM ${quoteIdent(table)} WHERE store = $1 AND week_start = $2`,
+    [store, weekStart]
+  );
   return res.rowCount || 0;
 }
 
@@ -159,7 +166,8 @@ async function insertRows(client, table, columnMap, rows, meta) {
 
 /**
  * High-level: load all captured weeks for ONE (report, store).
- * Does the per-store delete ONCE, then inserts every week's rows.
+ * For each captured week, deletes that (store, week) then inserts its rows,
+ * leaving any other weeks already synced for the store untouched.
  *
  * @param table   destination table name
  * @param store   store name
@@ -185,10 +193,13 @@ async function loadStore(table, store, weeksData) {
     const columnMap = buildColumnMap(allColumns);
 
     await ensureTable(client, table, columnMap);
-    const deleted = await deleteStoreRows(client, table, store);
 
+    let deleted = 0;
     let inserted = 0;
     for (const wd of weeksData) {
+      // Per-(store, week) full-refresh: replace only the weeks captured this
+      // run, preserving previously-synced weeks for this store.
+      deleted += await deleteStoreWeekRows(client, table, store, wd.week.startISO);
       inserted += await insertRows(client, table, columnMap, wd.rows, {
         store,
         weekStart: wd.week.startISO,

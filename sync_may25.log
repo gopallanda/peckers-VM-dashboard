@@ -1,0 +1,31 @@
+
+> vm-extractor@1.0.0 sync
+> node src/index.js
+
+==========================================================
+ VM Hub -> Supabase sync
+  Reports : Net Sales by Channel
+  Stores  : Peckers Hitchin | Peckers Stevenage
+  Weeks   : 2026-05-25..2026-05-31
+  Headless: true
+==========================================================
+
+[extract] URL: https://hub.vitamojo.com/mp1-reporting
+[extract] Report iframe ready.
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Net Sales by Channel
+[ok]  Net Sales by Channel @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_net_sales_by_channel <- Peckers Hitchin: deleted 0, inserted 8
+[extract] Chart already "Net Sales by Channel" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Net Sales by Channel
+[ok]  Net Sales by Channel @ Peckers Stevenage [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_net_sales_by_channel <- Peckers Stevenage: deleted 0, inserted 8
+
+===================== RUN SUMMARY ========================
+OK             Net Sales by Channel @ Peckers Hitchin  rows=8
+OK             Net Sales by Channel @ Peckers Stevenage  rows=8
+==========================================================
+
+All reports synced successfully.

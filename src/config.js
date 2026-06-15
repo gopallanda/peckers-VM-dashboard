@@ -34,6 +34,7 @@ function bool(name, fallback = false) {
 // `chart` must be typed EXACTLY as it appears in the VM Hub "Chart" dropdown.
 // ---------------------------------------------------------------------------
 const REPORTS = [
+  // ── Executive Dashboard ── Already synced ────────────────────────────────
   {
     chart: 'Net Sales by Channel',
     table: 'vm_net_sales_by_channel',
@@ -48,6 +49,116 @@ const REPORTS = [
     chart: 'New vs return customer metrics',
     table: 'vm_customer_metrics',
     feeds: 'Customer Count',
+  },
+
+  // ── Product Performance Dashboard ── Already synced ──────────────────────
+  {
+    chart: 'Top Menu Items Sold',
+    table: 'vm_top_menu_items_sold',
+    feeds: 'Best sellers, revenue, units sold',
+  },
+  {
+    chart: 'Products sold (with uuid)',
+    table: 'vm_products_sold',
+    feeds: 'Product performance, WoW tracking',
+  },
+  {
+    chart: 'Products sold with modifiers and size',
+    table: 'vm_products_modifiers_size',
+    feeds: 'Modifier analysis',
+  },
+  {
+    chart: 'Top selling items per store per menu',
+    table: 'vm_top_items_store_menu',
+    feeds: 'Store-level product rankings',
+  },
+  {
+    chart: 'Sales by External Category',
+    table: 'vm_sales_external_category',
+    feeds: 'Category performance',
+  },
+  {
+    chart: 'Gross Sales by Category',
+    table: 'vm_gross_sales_category',
+    feeds: 'Category revenue',
+  },
+
+  // ── Daypart Analysis Dashboard ── Already synced ─────────────────────────
+  {
+    chart: 'Average order activity per hour per weekday',
+    table: 'vm_hourly_order_activity',
+    feeds: 'Hourly trading patterns',
+  },
+  {
+    chart: 'Average order activity per weekday',
+    table: 'vm_weekday_order_activity',
+    feeds: 'Weekday trends',
+  },
+  {
+    chart: 'Customer order activity',
+    table: 'vm_customer_order_activity',
+    feeds: 'Customer behaviour patterns',
+  },
+  {
+    chart: 'Sales overview by fulfilment date',
+    table: 'vm_sales_fulfilment_date',
+    feeds: 'Revenue by time period',
+  },
+  {
+    chart: 'Detailed Sales Info',
+    table: 'vm_detailed_sales_info',
+    feeds: 'Supporting daypart calculations',
+  },
+
+  // ── Delivery Platform Performance Dashboard ── Already synced ────────────
+  {
+    chart: 'Gross Sales by Store and Channel',
+    table: 'vm_sales_store_channel',
+    feeds: 'Channel revenue',
+  },
+  {
+    chart: 'Deliveroo Sales Analysis by Store',
+    table: 'vm_deliveroo_analysis',
+    feeds: 'Deliveroo performance',
+  },
+  {
+    chart: 'Delivery fee summary',
+    table: 'vm_delivery_fee_summary',
+    feeds: 'Delivery costs',
+  },
+  {
+    chart: 'Delivery Info',
+    table: 'vm_delivery_info',
+    feeds: 'Delivery metrics',
+  },
+
+  // ── Store Comparison Dashboard ── Already synced ─────────────────────────
+  {
+    chart: 'Gross Sales by Store',
+    table: 'vm_gross_sales_store',
+    feeds: 'Store revenue',
+  },
+  {
+    chart: 'Gross ATV by Store',
+    table: 'vm_gross_atv_store',
+    feeds: 'Store AOV',
+  },
+  {
+    chart: 'Customers: New vs Repeat by store',
+    table: 'vm_customer_store_metrics',
+    feeds: 'Store customer metrics',
+  },
+
+  // ── Orders (renamed to real VM Hub chart names) ──────────────────────────
+  {
+    chart: 'Orders by Channel',
+    table: 'vm_orders_store_channel',
+    feeds: 'Channel orders',
+  },
+  {
+    chart: 'Orders by store, brand, & channel',
+    table: 'vm_orders_store',
+    feeds: 'Store orders',
   },
 ];
 

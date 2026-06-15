@@ -1,0 +1,298 @@
+
+> vm-extractor@1.0.0 sync
+> node src/index.js
+
+==========================================================
+ VM Hub -> Supabase sync
+  Reports : Net Sales by Channel | Number of Orders by channel (fulfilment date) | New vs return customer metrics | Top Menu Items Sold | Products sold (with uuid) | Products sold with modifiers and size | Top selling items per store per menu | Sales by External Category | Gross Sales by Category | Average order activity per hour per weekday | Average order activity per weekday | Customer order activity | Sales overview by fulfilment date | Detailed Sales Info | Gross Sales by Store and Channel | Deliveroo Sales Analysis by Store | Delivery fee summary | Delivery Info | Gross Sales by Store | Gross ATV by Store | Customers: New vs Repeat by store | Orders by Channel | Orders by store, brand, & channel
+  Stores  : Peckers Hitchin | Peckers Stevenage
+  Weeks   : 2026-05-25..2026-05-31
+  Headless: true
+==========================================================
+
+[extract] URL: https://hub.vitamojo.com/mp1-reporting
+[extract] Report iframe ready.
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Net Sales by Channel
+[ok]  Net Sales by Channel @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_net_sales_by_channel <- Peckers Hitchin: deleted 8, inserted 8
+[extract] Chart already "Net Sales by Channel" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Net Sales by Channel
+[ok]  Net Sales by Channel @ Peckers Stevenage [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_net_sales_by_channel <- Peckers Stevenage: deleted 8, inserted 8
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Number of Orders by channel (fulfilment date)
+[ok]  Number of Orders by channel (fulfilment date) @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_orders_by_channel <- Peckers Hitchin: deleted 0, inserted 8
+[extract] Chart already "Number of Orders by channel (fulfilment date)" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Number of Orders by channel (fulfilment date)
+[ok]  Number of Orders by channel (fulfilment date) @ Peckers Stevenage [2026-05-25..2026-05-31] -> 56 rows
+[load] vm_orders_by_channel <- Peckers Stevenage: deleted 0, inserted 56
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: New vs return customer metrics
+[ok]  New vs return customer metrics @ Peckers Hitchin [2026-05-25..2026-05-31] -> 1 rows
+[load] vm_customer_metrics <- Peckers Hitchin: deleted 0, inserted 1
+[extract] Chart already "New vs return customer metrics" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: New vs return customer metrics
+[extract] CSV export failed (Invalid Opening Quote: a quote is found on field "order_window" at line 13, value is "{"); will try table fallback.
+[ok]  New vs return customer metrics @ Peckers Stevenage [2026-05-25..2026-05-31] -> 0 rows
+[load] vm_customer_metrics <- Peckers Stevenage: deleted 0, inserted 0
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Top Menu Items Sold
+[ok]  Top Menu Items Sold @ Peckers Hitchin [2026-05-25..2026-05-31] -> 144 rows
+[load] vm_top_menu_items_sold <- Peckers Hitchin: deleted 0, inserted 144
+[extract] Chart already "Top Menu Items Sold" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Top Menu Items Sold
+[ok]  Top Menu Items Sold @ Peckers Stevenage [2026-05-25..2026-05-31] -> 159 rows
+[load] vm_top_menu_items_sold <- Peckers Stevenage: deleted 0, inserted 159
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Products sold (with uuid)
+[ok]  Products sold (with uuid) @ Peckers Hitchin [2026-05-25..2026-05-31] -> 144 rows
+[load] vm_products_sold <- Peckers Hitchin: deleted 0, inserted 144
+[extract] Chart already "Products sold (with uuid)" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Products sold (with uuid)
+[ok]  Products sold (with uuid) @ Peckers Stevenage [2026-05-25..2026-05-31] -> 159 rows
+[load] vm_products_sold <- Peckers Stevenage: deleted 0, inserted 159
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Products sold with modifiers and size
+[ok]  Products sold with modifiers and size @ Peckers Hitchin [2026-05-25..2026-05-31] -> 612 rows
+[load] vm_products_modifiers_size <- Peckers Hitchin: deleted 0, inserted 612
+[extract] Chart already "Products sold with modifiers and size" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Products sold with modifiers and size
+[ok]  Products sold with modifiers and size @ Peckers Stevenage [2026-05-25..2026-05-31] -> 735 rows
+[load] vm_products_modifiers_size <- Peckers Stevenage: deleted 0, inserted 735
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Top selling items per store per menu
+[ok]  Top selling items per store per menu @ Peckers Hitchin [2026-05-25..2026-05-31] -> 1656 rows
+[load] vm_top_items_store_menu <- Peckers Hitchin: deleted 0, inserted 1656
+[extract] Chart already "Top selling items per store per menu" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Top selling items per store per menu
+[ok]  Top selling items per store per menu @ Peckers Stevenage [2026-05-25..2026-05-31] -> 2558 rows
+[load] vm_top_items_store_menu <- Peckers Stevenage: deleted 0, inserted 2558
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Sales by External Category
+[ok]  Sales by External Category @ Peckers Hitchin [2026-05-25..2026-05-31] -> 3 rows
+[load] vm_sales_external_category <- Peckers Hitchin: deleted 0, inserted 3
+[extract] Chart already "Sales by External Category" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Sales by External Category
+[ok]  Sales by External Category @ Peckers Stevenage [2026-05-25..2026-05-31] -> 200 rows
+[load] vm_sales_external_category <- Peckers Stevenage: deleted 0, inserted 200
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Gross Sales by Category
+[ok]  Gross Sales by Category @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_gross_sales_category <- Peckers Hitchin: deleted 0, inserted 8
+[extract] Chart already "Gross Sales by Category" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Gross Sales by Category
+[ok]  Gross Sales by Category @ Peckers Stevenage [2026-05-25..2026-05-31] -> 3 rows
+[load] vm_gross_sales_category <- Peckers Stevenage: deleted 0, inserted 3
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Average order activity per hour per weekday
+[ok]  Average order activity per hour per weekday @ Peckers Hitchin [2026-05-25..2026-05-31] -> 74 rows
+[load] vm_hourly_order_activity <- Peckers Hitchin: deleted 0, inserted 74
+[extract] Chart already "Average order activity per hour per weekday" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Average order activity per hour per weekday
+[ok]  Average order activity per hour per weekday @ Peckers Stevenage [2026-05-25..2026-05-31] -> 79 rows
+[load] vm_hourly_order_activity <- Peckers Stevenage: deleted 0, inserted 79
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Average order activity per weekday
+[ok]  Average order activity per weekday @ Peckers Hitchin [2026-05-25..2026-05-31] -> 7 rows
+[load] vm_weekday_order_activity <- Peckers Hitchin: deleted 0, inserted 7
+[extract] Chart already "Average order activity per weekday" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Average order activity per weekday
+[ok]  Average order activity per weekday @ Peckers Stevenage [2026-05-25..2026-05-31] -> 7 rows
+[load] vm_weekday_order_activity <- Peckers Stevenage: deleted 0, inserted 7
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Customer order activity
+[ok]  Customer order activity @ Peckers Hitchin [2026-05-25..2026-05-31] -> 454 rows
+[load] vm_customer_order_activity <- Peckers Hitchin: deleted 0, inserted 454
+[extract] Chart already "Customer order activity" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Customer order activity
+[ok]  Customer order activity @ Peckers Stevenage [2026-05-25..2026-05-31] -> 689 rows
+[load] vm_customer_order_activity <- Peckers Stevenage: deleted 0, inserted 689
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Sales overview by fulfilment date
+[ok]  Sales overview by fulfilment date @ Peckers Hitchin [2026-05-25..2026-05-31] -> 6 rows
+[load] vm_sales_fulfilment_date <- Peckers Hitchin: deleted 0, inserted 6
+[extract] Chart already "Sales overview by fulfilment date" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Sales overview by fulfilment date
+[ok]  Sales overview by fulfilment date @ Peckers Stevenage [2026-05-25..2026-05-31] -> 258 rows
+[load] vm_sales_fulfilment_date <- Peckers Stevenage: deleted 0, inserted 258
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Detailed Sales Info
+[ok]  Detailed Sales Info @ Peckers Hitchin [2026-05-25..2026-05-31] -> 3780 rows
+[load] vm_detailed_sales_info <- Peckers Hitchin: deleted 0, inserted 3780
+[extract] Chart already "Detailed Sales Info" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Detailed Sales Info
+[ok]  Detailed Sales Info @ Peckers Stevenage [2026-05-25..2026-05-31] -> 5966 rows
+[load] vm_detailed_sales_info <- Peckers Stevenage: deleted 0, inserted 5966
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Gross Sales by Store and Channel
+[ok]  Gross Sales by Store and Channel @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_sales_store_channel <- Peckers Hitchin: deleted 0, inserted 8
+[extract] Chart already "Gross Sales by Store and Channel" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Gross Sales by Store and Channel
+[ok]  Gross Sales by Store and Channel @ Peckers Stevenage [2026-05-25..2026-05-31] -> 371 rows
+[load] vm_sales_store_channel <- Peckers Stevenage: deleted 0, inserted 371
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Deliveroo Sales Analysis by Store
+[ok]  Deliveroo Sales Analysis by Store @ Peckers Hitchin [2026-05-25..2026-05-31] -> 1 rows
+[load] vm_deliveroo_analysis <- Peckers Hitchin: deleted 0, inserted 1
+[extract] Chart already "Deliveroo Sales Analysis by Store" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Deliveroo Sales Analysis by Store
+[ok]  Deliveroo Sales Analysis by Store @ Peckers Stevenage [2026-05-25..2026-05-31] -> 38 rows
+[load] vm_deliveroo_analysis <- Peckers Stevenage: deleted 0, inserted 38
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Delivery fee summary
+[ok]  Delivery fee summary @ Peckers Hitchin [2026-05-25..2026-05-31] -> 1 rows
+[load] vm_delivery_fee_summary <- Peckers Hitchin: deleted 0, inserted 1
+[extract] Chart already "Delivery fee summary" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Delivery fee summary
+[ok]  Delivery fee summary @ Peckers Stevenage [2026-05-25..2026-05-31] -> 84 rows
+[load] vm_delivery_fee_summary <- Peckers Stevenage: deleted 0, inserted 84
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Delivery Info
+[ok]  Delivery Info @ Peckers Hitchin [2026-05-25..2026-05-31] -> 93 rows
+[load] vm_delivery_info <- Peckers Hitchin: deleted 0, inserted 93
+[extract] Chart already "Delivery Info" — keeping.
+[extract] No Interval control in this report — skipping (report defaults apply).
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Delivery Info
+[ok]  Delivery Info @ Peckers Stevenage [2026-05-25..2026-05-31] -> 89 rows
+[load] vm_delivery_info <- Peckers Stevenage: deleted 0, inserted 89
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Gross Sales by Store
+[ok]  Gross Sales by Store @ Peckers Hitchin [2026-05-25..2026-05-31] -> 4 rows
+[load] vm_gross_sales_store <- Peckers Hitchin: deleted 0, inserted 4
+[extract] Chart already "Gross Sales by Store" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Gross Sales by Store
+[ok]  Gross Sales by Store @ Peckers Stevenage [2026-05-25..2026-05-31] -> 1 rows
+[load] vm_gross_sales_store <- Peckers Stevenage: deleted 0, inserted 1
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Gross ATV by Store
+[ok]  Gross ATV by Store @ Peckers Hitchin [2026-05-25..2026-05-31] -> 4 rows
+[load] vm_gross_atv_store <- Peckers Hitchin: deleted 0, inserted 4
+[extract] Chart already "Gross ATV by Store" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Gross ATV by Store
+[ok]  Gross ATV by Store @ Peckers Stevenage [2026-05-25..2026-05-31] -> 1 rows
+[load] vm_gross_atv_store <- Peckers Stevenage: deleted 0, inserted 1
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart confirmed: Customers: New vs Repeat by store
+[ok]  Customers: New vs Repeat by store @ Peckers Hitchin [2026-05-25..2026-05-31] -> 1 rows
+[load] vm_customer_store_metrics <- Peckers Hitchin: deleted 0, inserted 1
+[extract] Chart already "Customers: New vs Repeat by store" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart confirmed: Customers: New vs Repeat by store
+[ok]  Customers: New vs Repeat by store @ Peckers Stevenage [2026-05-25..2026-05-31] -> 79 rows
+[load] vm_customer_store_metrics <- Peckers Stevenage: deleted 0, inserted 79
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Orders by Channel
+[ok]  Orders by Channel @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_orders_store_channel <- Peckers Hitchin: deleted 0, inserted 8
+[extract] Chart already "Orders by Channel" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Fresh Metabase result not detected before timeout.
+[extract] Active chart confirmed: Orders by Channel
+[ok]  Orders by Channel @ Peckers Stevenage [2026-05-25..2026-05-31] -> 371 rows
+[load] vm_orders_store_channel <- Peckers Stevenage: deleted 0, inserted 371
+[extract] Stores selected: ["Peckers Hitchin"]
+[extract] Active chart "Orders by store, brand, " != requested "Orders by store, brand, & channel".
+[ok]  Orders by store, brand, & channel @ Peckers Hitchin [2026-05-25..2026-05-31] -> 8 rows
+[load] vm_orders_store <- Peckers Hitchin: deleted 0, inserted 8
+[extract] Chart already "Orders by store, brand, & channel" — keeping.
+[extract] Stores selected: ["Peckers Stevenage"]
+[extract] Active chart "Orders by store, brand, " != requested "Orders by store, brand, & channel".
+[ok]  Orders by store, brand, & channel @ Peckers Stevenage [2026-05-25..2026-05-31] -> 371 rows
+[load] vm_orders_store <- Peckers Stevenage: deleted 0, inserted 371
+
+===================== RUN SUMMARY ========================
+OK             Net Sales by Channel @ Peckers Hitchin  rows=8
+OK             Net Sales by Channel @ Peckers Stevenage  rows=8
+OK             Number of Orders by channel (fulfilment date) @ Peckers Hitchin  rows=8
+OK             Number of Orders by channel (fulfilment date) @ Peckers Stevenage  rows=56
+OK             New vs return customer metrics @ Peckers Hitchin  rows=1
+OK             New vs return customer metrics @ Peckers Stevenage  rows=0
+OK             Top Menu Items Sold @ Peckers Hitchin  rows=144
+OK             Top Menu Items Sold @ Peckers Stevenage  rows=159
+OK             Products sold (with uuid) @ Peckers Hitchin  rows=144
+OK             Products sold (with uuid) @ Peckers Stevenage  rows=159
+OK             Products sold with modifiers and size @ Peckers Hitchin  rows=612
+OK             Products sold with modifiers and size @ Peckers Stevenage  rows=735
+OK             Top selling items per store per menu @ Peckers Hitchin  rows=1656
+OK             Top selling items per store per menu @ Peckers Stevenage  rows=2558
+OK             Sales by External Category @ Peckers Hitchin  rows=3
+OK             Sales by External Category @ Peckers Stevenage  rows=200
+OK             Gross Sales by Category @ Peckers Hitchin  rows=8
+OK             Gross Sales by Category @ Peckers Stevenage  rows=3
+OK             Average order activity per hour per weekday @ Peckers Hitchin  rows=74
+OK             Average order activity per hour per weekday @ Peckers Stevenage  rows=79
+OK             Average order activity per weekday @ Peckers Hitchin  rows=7
+OK             Average order activity per weekday @ Peckers Stevenage  rows=7
+OK             Customer order activity @ Peckers Hitchin  rows=454
+OK             Customer order activity @ Peckers Stevenage  rows=689
+OK             Sales overview by fulfilment date @ Peckers Hitchin  rows=6
+OK             Sales overview by fulfilment date @ Peckers Stevenage  rows=258
+OK             Detailed Sales Info @ Peckers Hitchin  rows=3780
+OK             Detailed Sales Info @ Peckers Stevenage  rows=5966
+OK             Gross Sales by Store and Channel @ Peckers Hitchin  rows=8
+OK             Gross Sales by Store and Channel @ Peckers Stevenage  rows=371
+OK             Deliveroo Sales Analysis by Store @ Peckers Hitchin  rows=1
+OK             Deliveroo Sales Analysis by Store @ Peckers Stevenage  rows=38
+OK             Delivery fee summary @ Peckers Hitchin  rows=1
+OK             Delivery fee summary @ Peckers Stevenage  rows=84
+OK             Delivery Info @ Peckers Hitchin  rows=93
+OK             Delivery Info @ Peckers Stevenage  rows=89
+OK             Gross Sales by Store @ Peckers Hitchin  rows=4
+OK             Gross Sales by Store @ Peckers Stevenage  rows=1
+OK             Gross ATV by Store @ Peckers Hitchin  rows=4
+OK             Gross ATV by Store @ Peckers Stevenage  rows=1
+OK             Customers: New vs Repeat by store @ Peckers Hitchin  rows=1
+OK             Customers: New vs Repeat by store @ Peckers Stevenage  rows=79
+OK             Orders by Channel @ Peckers Hitchin  rows=8
+OK             Orders by Channel @ Peckers Stevenage  rows=371
+OK             Orders by store, brand, & channel @ Peckers Hitchin  rows=8
+OK             Orders by store, brand, & channel @ Peckers Stevenage  rows=371
+==========================================================
+
+All reports synced successfully.

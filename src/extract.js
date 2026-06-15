@@ -339,7 +339,16 @@ async function setDate(page, frame, which /* 'start' | 'end' */, ddmmyyyy) {
   const dayNum = parseInt(ddmmyyyy.slice(0, 2), 10); // DD/MM/YYYY -> day
   const input = frame.locator(sel);
 
+  // Press Escape to dismiss any open calendar popover before interaction.
+  // This avoids the "intercepts pointer events" timeout entirely.
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(150);
+
+  // Click the input to open the date picker.
   await input.click();
+  await page.waitForTimeout(200);
+
+  // Select all existing text and type the new date.
   await page.keyboard.press('Control+A');
   await page.keyboard.press('Delete');
   await page.keyboard.type(ddmmyyyy, { delay: 40 });

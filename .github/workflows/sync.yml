@@ -1,74 +1,106 @@
-name: VM Hub -> Supabase sync
+name: Weekly VM Hub → Supabase Sync
 
 on:
   schedule:
-    # Mondays 04:00 UTC
-    - cron: '0 4 * * 1'
+    # Monday 01:30 UTC = 07:00 IST (UTC+5:30)
+    - cron: '30 1 * * 1'
   workflow_dispatch:
     inputs:
       start_date:
-        description: 'Optional START_DATE (YYYY-MM-DD)'
+        description: 'Override START_DATE (YYYY-MM-DD, optional)'
         required: false
       end_date:
-        description: 'Optional END_DATE (YYYY-MM-DD)'
+        description: 'Override END_DATE (YYYY-MM-DD, optional)'
         required: false
       weeks_back:
-        description: 'WEEKS_BACK (ignored if start/end set)'
+        description: 'Weeks to sync (default 1 = last complete Mon–Sun week)'
         required: false
-        default: '4'
+        default: '1'
 
+# Never cancel a running sync — queue a new one instead.
 concurrency:
   group: vm-sync
   cancel-in-progress: false
 
 jobs:
   sync:
+    name: Sync Vita Mojo → Supabase
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: vm-extractor
-    env:
-      VM_HUB_URL: ${{ secrets.VM_HUB_URL }}
-      VM_HUB_EMAIL: ${{ secrets.VM_HUB_EMAIL }}
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      STORES: ${{ secrets.STORES }}
-      WEEKS_BACK: ${{ github.event.inputs.weeks_back || '4' }}
-      START_DATE: ${{ github.event.inputs.start_date }}
-      END_DATE: ${{ github.event.inputs.end_date }}
-      HEADLESS: '1'
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 60
 
-      - uses: actions/setup-node@v4
+    env:
+      VM_HUB_URL: https://hub.vitamojo.com
+      VM_HUB_EMAIL: ${{ secrets.VM_HUB_EMAIL }}
+      VM_HUB_PASSWORD: ${{ secrets.VM_HUB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      STORES: 'Peckers Hitchin,Peckers Stevenage'
+      HEADLESS: '1'
+      DEBUG_SHOTS: '0'
+      WEEKS_BACK: ${{ github.event.inputs.weeks_back || '1' }}
+      START_DATE: ${{ github.event.inputs.start_date || '' }}
+      END_DATE: ${{ github.event.inputs.end_date || '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: vm-extractor/package-lock.json
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright Chromium + system deps
         run: npx playwright install --with-deps chromium
 
-      - name: Restore saved VM Hub session
-        # The session is saved once locally via `npm run auth` and stored as a
-        # repo secret. See README for how to create VM_AUTH_JSON.
+      - name: Restore saved VM Hub session (optional)
+        # VM_AUTH_JSON holds the output of `context.storageState()` saved after
+        # running `npm run auth` locally. Restoring it lets auto-auth skip the
+        # password flow when the session is still valid (faster, more reliable).
+        # If the secret is absent or the session has expired, auto-auth falls
+        # back to email+password login automatically.
         run: |
-          printf '%s' "${{ secrets.VM_AUTH_JSON }}" > auth.json
-          test -s auth.json || (echo "auth.json is empty — set the VM_AUTH_JSON secret" && exit 1)
+          if [ -n "${{ secrets.VM_AUTH_JSON }}" ]; then
+            printf '%s' "${{ secrets.VM_AUTH_JSON }}" > auth.json
+            echo "[setup] Restored auth.json from VM_AUTH_JSON secret."
+          else
+            echo "[setup] VM_AUTH_JSON not set — auto-auth will log in fresh."
+          fi
 
-      - name: Run sync
+      - name: Authenticate with VM Hub
+        # Tries the restored session; falls back to email+password if expired.
+        # Saves a refreshed auth.json on success (used immediately by sync).
+        run: node src/auto-auth.js
+
+      - name: Run sync (previous complete week)
         run: npm run sync
 
-      - name: Upload debug artifacts on failure
+      - name: Upload debug artefacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: vm-sync-debug
+          name: vm-sync-debug-${{ github.run_id }}
           path: |
-            vm-extractor/debug/
-            vm-extractor/downloads/
+            debug/
+            downloads/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### ✅ Sync completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Sync failed — check logs above" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Completed at | $(date -u '+%Y-%m-%d %H:%M UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| WEEKS_BACK | ${WEEKS_BACK} |" >> $GITHUB_STEP_SUMMARY
+          echo "| START_DATE override | ${START_DATE:-none} |" >> $GITHUB_STEP_SUMMARY
+          echo "| END_DATE override | ${END_DATE:-none} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stores | ${STORES} |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Executive Dashboard | Peckers</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      color: white;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      font-size: 1.1em;
+      opacity: 0.9;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 40px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .control-group label {
+      font-weight: 600;
+      color: #333;
+      font-size: 0.9em;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    select,
+    input {
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 1em;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    select:focus,
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .refresh-btn {
+      padding: 12px 24px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      align-self: flex-end;
+    }
+
+    .refresh-btn:hover {
+      background: #5568d3;
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Loading state */
+    .loading {
+      text-align: center;
+      color: white;
+      font-size: 1.2em;
+      margin: 40px 0;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .kpi-card {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .kpi-label {
+      font-size: 0.85em;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .kpi-value {
+      font-size: 2.2em;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 12px;
+    }
+
+    .kpi-unit {
+      font-size: 0.6em;
+      color: #999;
+      margin-left: 4px;
+    }
+
+    .kpi-change {
+      font-size: 0.95em;
+      padding: 8px 12px;
+      border-radius: 4px;
+      display: inline-block;
+      font-weight: 600;
+    }
+
+    .kpi-change.positive {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .kpi-change.negative {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .kpi-change.neutral {
+      background: #e2e3e5;
+      color: #383d41;
+    }
+
+    /* Comparison view */
+    .comparison-section {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      margin-top: 40px;
+    }
+
+    .comparison-section h2 {
+      font-size: 1.5em;
+      margin-bottom: 24px;
+      color: #333;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .comparison-item {
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+
+    .comparison-label {
+      font-size: 0.85em;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .comparison-values {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .store-value {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .store-name {
+      font-size: 0.85em;
+      color: #999;
+    }
+
+    .store-amount {
+      font-size: 1.3em;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .comparison-diff {
+      padding: 12px;
+      background: white;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .winner {
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-weight: 600;
+    }
+
+    /* Error state */
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      padding: 16px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 1.8em;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .control-group {
+        min-width: auto;
+      }
+
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 Executive Dashboard</h1>
+      <p>Peckers Stores | Real-time KPI Analytics</p>
+    </header>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="control-group">
+        <label for="store-select">Select Store</label>
+        <select id="store-select">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="week-select">Select Week</label>
+        <select id="week-select">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh</button>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading" class="loading" style="display: none;">
+      <div class="spinner"></div>
+      <p style="margin-top: 20px;">Loading dashboard...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error" class="error" style="display: none;"></div>
+
+    <!-- KPI Cards -->
+    <div id="kpi-grid" class="kpi-grid" style="display: none;"></div>
+
+    <!-- Comparison Section -->
+    <div id="comparison-section" class="comparison-section" style="display: none;">
+      <h2>Store Comparison</h2>
+      <div id="comparison-grid" class="comparison-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadStoresAndWeeks();
+      await loadDashboard();
+    });
+
+    document.getElementById('store-select').addEventListener('change', loadDashboard);
+    document.getElementById('week-select').addEventListener('change', loadDashboard);
+
+    // Load available stores and weeks
+    async function loadStoresAndWeeks() {
+      try {
+        const [storesRes, weeksRes] = await Promise.all([
+          fetch(`${API_BASE}/stores`),
+          fetch(`${API_BASE}/weeks`)
+        ]);
+
+        const { stores } = await storesRes.json();
+        const { weeks } = await weeksRes.json();
+
+        const storeSelect = document.getElementById('store-select');
+        storeSelect.innerHTML = `
+          <option value="">All Stores</option>
+          ${stores.map(s => `<option value="${s}">${s}</option>`).join('')}
+        `;
+
+        const weekSelect = document.getElementById('week-select');
+        weekSelect.innerHTML = weeks.length > 0
+          ? weeks.map((w, i) => `<option value="${w.week_start}" ${i === 0 ? 'selected' : ''}>${w.week_start}</option>`).join('')
+          : '<option>No data</option>';
+      } catch (err) {
+        showError('Failed to load stores and weeks: ' + err.message);
+      }
+    }
+
+    // Load dashboard data
+    async function loadDashboard() {
+      const store = document.getElementById('store-select').value;
+      const week_start = document.getElementById('week-select').value;
+
+      showLoading(true);
+      hideError();
+
+      try {
+        let endpoint;
+
+        if (!store) {
+          // All stores → comparison view
+          endpoint = `/api/kpis/comparison${week_start ? `?week_start=${week_start}` : ''}`;
+          const res = await fetch(endpoint);
+          const { data } = await res.json();
+          renderComparison(data);
+        } else {
+          // Single store
+          endpoint = `/api/kpis/single?store=${encodeURIComponent(store)}&week_start=${week_start || ''}`;
+          const res = await fetch(endpoint);
+          if (!res.ok) throw new Error(await res.text());
+          const { data } = await res.json();
+          renderSingleStore(data);
+        }
+
+        showLoading(false);
+      } catch (err) {
+        showError('Failed to load KPIs: ' + err.message);
+        showLoading(false);
+      }
+    }
+
+    // Render single store KPIs
+    function renderSingleStore(kpi) {
+      const grid = document.getElementById('kpi-grid');
+      const compSection = document.getElementById('comparison-section');
+
+      const kpis = [
+        { label: 'Net Sales', value: kpi.net_sales, unit: '£', format: true },
+        { label: 'Number of Orders', value: kpi.number_of_orders, unit: '', format: false },
+        { label: 'Average Order Value', value: kpi.aov, unit: ' £', format: true },
+        { label: 'Customer Count', value: kpi.customer_count, unit: '', format: false },
+        { label: 'Delivery Sales %', value: kpi.delivery_pct, unit: '%', format: true },
+        { label: 'Collection Sales %', value: kpi.collection_pct, unit: '%', format: true },
+        { label: 'Eat-In Sales %', value: kpi.eat_in_pct, unit: '%', format: true },
+        { label: 'WoW Growth', value: kpi.net_sales_wow_pct, unit: '%', format: true, isGrowth: true },
+      ];
+
+      grid.innerHTML = kpis.map(k => `
+        <div class="kpi-card">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-value">
+            ${k.format ? formatNumber(k.value) : Math.round(k.value)}
+            <span class="kpi-unit">${k.unit}</span>
+          </div>
+          ${k.isGrowth ? `
+            <div class="kpi-change ${k.value >= 0 ? 'positive' : 'negative'}">
+              ${k.value >= 0 ? '↑' : '↓'} ${Math.abs(k.value)}%
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+
+      grid.style.display = 'grid';
+      compSection.style.display = 'none';
+    }
+
+    // Render comparison (all stores)
+    function renderComparison(data) {
+      const grid = document.getElementById('kpi-grid');
+      const compSection = document.getElementById('comparison-section');
+      const compGrid = document.getElementById('comparison-grid');
+
+      const metrics = [
+        { key: 'net_sales', label: 'Net Sales', unit: '£', format: true },
+        { key: 'number_of_orders', label: 'Number of Orders', unit: '', format: false },
+        { key: 'aov', label: 'Average Order Value', unit: '£', format: true },
+        { key: 'customer_count', label: 'Customer Count', unit: '', format: false },
+        { key: 'delivery_pct', label: 'Delivery Sales %', unit: '%', format: false },
+        { key: 'collection_pct', label: 'Collection Sales %', unit: '%', format: false },
+        { key: 'eat_in_pct', label: 'Eat-In Sales %', unit: '%', format: false },
+      ];
+
+      compGrid.innerHTML = metrics.map(m => {
+        const comp = data.comparison[m.key];
+        const vals = comp.values;
+        const storeKeys = Object.keys(vals);
+
+        return `
+          <div class="comparison-item">
+            <div class="comparison-label">${m.label}</div>
+            <div class="comparison-values">
+              ${storeKeys.map(key => `
+                <div class="store-value">
+                  <span class="store-name">${key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                  <span class="store-amount">${m.format ? formatNumber(vals[key]) : Math.round(vals[key])} ${m.unit}</span>
+                </div>
+              `).join('')}
+            </div>
+            ${comp.diff !== null ? `
+              <div class="comparison-diff ${comp.winner ? 'winner' : ''}">
+                Diff: ${m.format ? formatNumber(comp.diff) : Math.round(comp.diff)} ${m.unit}
+                ${comp.diff_pct ? ` (${comp.diff_pct}%)` : ''}
+                ${comp.winner ? ` • Winner: ${comp.winner}` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      grid.style.display = 'none';
+      compSection.style.display = 'block';
+    }
+
+    function formatNumber(n) {
+      if (!n) return '0';
+      return parseFloat(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').style.display = show ? 'block' : 'none';
+    }
+
+    function showError(msg) {
+      const err = document.getElementById('error');
+      err.textContent = msg;
+      err.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error').style.display = 'none';
+    }
+  </script>
+</body>
+
+</html>
