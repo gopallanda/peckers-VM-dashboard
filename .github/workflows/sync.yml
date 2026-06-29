@@ -35,7 +35,7 @@ jobs:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       STORES: 'Peckers Hitchin,Peckers Stevenage'
       HEADLESS: '1'
-      DEBUG_SHOTS: '0'
+      DEBUG_SHOTS: '1'
       WEEKS_BACK: ${{ github.event.inputs.weeks_back || '1' }}
       START_DATE: ${{ github.event.inputs.start_date || '' }}
       END_DATE: ${{ github.event.inputs.end_date || '' }}

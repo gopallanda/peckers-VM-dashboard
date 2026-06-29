@@ -441,12 +441,17 @@ function currentEmbedUrl(page) {
  * `prevUrl`) and render its table. Waiting for the URL to change is what stops
  * us from fetching the PREVIOUS report's stale data. Returns the Frame.
  */
-async function waitForResults(page, prevUrl = '', timeoutMs = 120000) {
+async function waitForResults(page, prevUrl = '', timeoutMs = 210000) {
   const deadline = Date.now() + timeoutMs;
   let embed = null;
+  let urlChanged = false;
   while (Date.now() < deadline) {
     embed = findEmbedFrame(page);
     if (embed && embed.url() !== prevUrl) {
+      if (!urlChanged) {
+        console.log(`[extract] Embed URL changed (new token) — waiting for table to render.`);
+        urlChanged = true;
+      }
       const hasTable = await embed
         .locator('table, [class*="TableInteractive"]')
         .first()
@@ -458,12 +463,14 @@ async function waitForResults(page, prevUrl = '', timeoutMs = 120000) {
           .first()
           .waitFor({ state: 'visible', timeout: 30000 })
           .catch(() => {});
+        console.log(`[extract] Table visible after ~${Math.round((timeoutMs - (deadline - Date.now())) / 1000)}s.`);
         return embed;
       }
     }
     await page.waitForTimeout(2000);
   }
-  console.warn('[extract] Fresh Metabase result not detected before timeout.');
+  // Chart may render as a visualization (not a table) — CSV path can still succeed.
+  console.warn(`[extract] Table not detected in ${timeoutMs / 1000}s (chart may render as graph). URL changed=${urlChanged}. Proceeding to CSV capture.`);
   return embed;
 }
 
@@ -511,12 +518,13 @@ async function captureViaCsv(page, tag) {
   if (!token) return null;
 
   const csvUrl = `${u.origin}/api/embed/card/${token}/query/csv`;
-  const resp = await page.request.get(csvUrl, { timeout: 60000 }).catch((e) => {
-    console.warn(`[extract] CSV request error: ${e.message}`);
+  console.log(`[extract] Fetching CSV for tag=${tag} …`);
+  const resp = await page.request.get(csvUrl, { timeout: 120000 }).catch((e) => {
+    console.warn(`[extract] CSV request error (${tag}): ${e.message}`);
     return null;
   });
   if (!resp || !resp.ok()) {
-    console.warn(`[extract] CSV endpoint returned ${resp ? resp.status() : 'no response'}.`);
+    console.warn(`[extract] CSV endpoint returned ${resp ? resp.status() : 'no response'} for ${tag}.`);
     return null;
   }
 
@@ -600,7 +608,11 @@ async function extractReportForStoreWeek(page, opts) {
     return null;
   });
   if (!captured || !captured.rows.length) {
+    console.warn(`[extract] CSV returned ${captured ? 0 : 'null'} rows for ${tag} — falling back to DOM table scrape.`);
     captured = await captureViaTable(page);
+    console.log(`[extract] DOM table fallback returned ${captured.rows.length} rows for ${tag}.`);
+  } else {
+    console.log(`[extract] CSV captured ${captured.rows.length} rows for ${tag}.`);
   }
   await shot(page, `${tag}_result`);
 

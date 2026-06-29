@@ -86,8 +86,8 @@ LANGUAGE sql IMMUTABLE AS $$
     WHEN hour >= 11 AND hour < 14 THEN 'Lunch (11-2pm)'
     WHEN hour >= 14 AND hour < 17 THEN 'Afternoon (2-5pm)'
     WHEN hour >= 17 AND hour < 20 THEN 'Dinner (5-8pm)'
-    WHEN hour >= 20 AND hour < 24 THEN 'Night (8-11pm)'
-    ELSE 'Late (11pm-5am)'
+    WHEN hour >= 20 AND hour < 24 THEN 'Night (8-12pm)'
+    ELSE 'Late (12-5am)'
   END;
 $$;
 

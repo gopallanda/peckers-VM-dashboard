@@ -34,7 +34,7 @@ function bool(name, fallback = false) {
 // `chart` must be typed EXACTLY as it appears in the VM Hub "Chart" dropdown.
 // ---------------------------------------------------------------------------
 const REPORTS = [
-  // ── Executive Dashboard ── Already synced ────────────────────────────────
+  //── Executive Dashboard ── Already synced ────────────────────────────────
   {
     chart: 'Net Sales by Channel',
     table: 'vm_net_sales_by_channel',
@@ -108,6 +108,27 @@ const REPORTS = [
     chart: 'Detailed Sales Info',
     table: 'vm_detailed_sales_info',
     feeds: 'Supporting daypart calculations',
+  },
+
+  {
+
+  chart:'Menu Category Sales',
+  table:'vm_menu_category_sales',
+  feeds:'o find meal oxes and platters',
+  },
+
+  // ── Lunch Time Deals (Daypart dashboard) ── NEW ──────────────────────────
+  // Pulled per store (extractor applies a single-store filter), so net_sales
+  // and counts are per store. Feeds vm_v_lunch_deals / vm_v_lunch_deals_by_item.
+  {
+    chart: 'Meal Deals Sold',
+    table: 'vm_meal_deals_sold',
+    feeds: 'Lunch Time Deals: orders, revenue, AOV, per-deal breakdown',
+  },
+  {
+    chart: 'Meals Deals Sold by store',
+    table:'vm_meal_deals_sold_by_store',
+     feeds: 'Lunch Time Deals: orders, revenue, AOV, per-deal breakdown',
   },
 
   // ── Delivery Platform Performance Dashboard ── Already synced ────────────
