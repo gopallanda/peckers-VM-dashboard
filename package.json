@@ -11,6 +11,7 @@
     "auth": "node src/auth.js",
     "auto-auth": "node src/auto-auth.js",
     "sync": "node src/index.js",
+    "import:exec": "node src/import_exec_excel.js",
     "inspect": "node src/inspect.js",
     "api-start": "node server.js",
     "api-dev": "nodemon server.js",
@@ -21,7 +22,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.0",
     "pg": "^8.12.0",
-    "playwright": "^1.45.0"
+    "playwright": "^1.45.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

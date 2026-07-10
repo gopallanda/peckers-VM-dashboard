@@ -416,7 +416,9 @@ async function clickUpdate(page, frame) {
     await page.waitForTimeout(500);
   }
   await update.click();
-  await page.waitForLoadState('networkidle').catch(() => {});
+  // Don't wait for networkidle here — the embed keeps long-polling, so
+  // networkidle rarely settles and just burns time. waitForResults() detects
+  // the new query by the fresh embed token instead.
 }
 
 // The results live in a nested Metabase embed iframe whose URL carries a
@@ -438,40 +440,29 @@ function currentEmbedUrl(page) {
 
 /**
  * Wait for the Metabase embed to reload with a FRESH token (different from
- * `prevUrl`) and render its table. Waiting for the URL to change is what stops
- * us from fetching the PREVIOUS report's stale data. Returns the Frame.
+ * `prevUrl`). A changed token means Update minted a new query for the new
+ * filters, so we never capture the PREVIOUS report's stale data.
+ *
+ * We deliberately DO NOT wait for the DOM table to render: capture goes through
+ * the signed-embed CSV endpoint, which runs the query server-side from the
+ * token alone. Graph-type reports never render a <table> and used to burn the
+ * full timeout here (~3.5 min each). Returning on token change removes that
+ * dead wait and the per-report DOM-render/virtualisation overhead.
  */
-async function waitForResults(page, prevUrl = '', timeoutMs = 210000) {
+async function waitForResults(page, prevUrl = '', timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;
-  let embed = null;
-  let urlChanged = false;
   while (Date.now() < deadline) {
-    embed = findEmbedFrame(page);
+    const embed = findEmbedFrame(page);
     if (embed && embed.url() !== prevUrl) {
-      if (!urlChanged) {
-        console.log(`[extract] Embed URL changed (new token) — waiting for table to render.`);
-        urlChanged = true;
-      }
-      const hasTable = await embed
-        .locator('table, [class*="TableInteractive"]')
-        .first()
-        .count()
-        .catch(() => 0);
-      if (hasTable) {
-        await embed
-          .locator('table, [class*="TableInteractive"]')
-          .first()
-          .waitFor({ state: 'visible', timeout: 30000 })
-          .catch(() => {});
-        console.log(`[extract] Table visible after ~${Math.round((timeoutMs - (deadline - Date.now())) / 1000)}s.`);
-        return embed;
-      }
+      const waited = Math.round((timeoutMs - (deadline - Date.now())) / 1000);
+      console.log(`[extract] Embed token changed after ~${waited}s — capturing via CSV endpoint.`);
+      await page.waitForTimeout(500); // let the new token settle before capture
+      return embed;
     }
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
   }
-  // Chart may render as a visualization (not a table) — CSV path can still succeed.
-  console.warn(`[extract] Table not detected in ${timeoutMs / 1000}s (chart may render as graph). URL changed=${urlChanged}. Proceeding to CSV capture.`);
-  return embed;
+  console.warn(`[extract] Embed token did not change within ${timeoutMs / 1000}s of Update; proceeding with current frame.`);
+  return findEmbedFrame(page);
 }
 
 /**
