@@ -35,21 +35,21 @@ function bool(name, fallback = false) {
 // ---------------------------------------------------------------------------
 const REPORTS = [
   //── Executive Dashboard ── Already synced ────────────────────────────────
-  // {
-  //   chart: 'Net Sales by Channel',
-  //   table: 'vm_net_sales_by_channel',
-  //   feeds: 'Net Sales, Delivery %, Collection %, Eat-In %, WoW, delivery sub-channels',
-  // },
-  // {
-  //   chart: 'Number of Orders by channel (fulfilment date)',
-  //   table: 'vm_orders_by_channel',
-  //   feeds: 'Number of Orders, AOV',
-  // },
-  // {
-  //   chart: 'New vs return customer metrics',
-  //   table: 'vm_customer_metrics',
-  //   feeds: 'Customer Count',
-  // },
+  {
+    chart: 'Net Sales by Channel',
+    table: 'vm_net_sales_by_channel',
+    feeds: 'Net Sales, Delivery %, Collection %, Eat-In %, WoW, delivery sub-channels',
+  },
+  {
+    chart: 'Number of Orders by channel (fulfilment date)',
+    table: 'vm_orders_by_channel',
+    feeds: 'Number of Orders, AOV',
+  },
+  {
+    chart: 'New vs return customer metrics',
+    table: 'vm_customer_metrics',
+    feeds: 'Customer Count',
+  },
 
   // ── Product Performance Dashboard ── Already synced ──────────────────────
   {
