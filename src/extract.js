@@ -498,7 +498,30 @@ async function applyFilters(page, { report, store, week }) {
 //
 // FALLBACK: scrape the rendered Metabase table (visible rows only).
 // ---------------------------------------------------------------------------
-async function captureViaCsv(page, tag) {
+
+/**
+ * Thrown when the CSV endpoint returns a Metabase query-processor failure (see
+ * looksLikeFailedQuery). It is a HARD failure — the accompanying rows are
+ * partial — so it must propagate to withRetry() rather than be masked by an
+ * empty table scrape.
+ */
+class QueryProcessorError extends Error {}
+
+/**
+ * Metabase's signed-embed CSV endpoint streams whatever rows it has computed and,
+ * when the query processor aborts (heavy-query timeout / OOM), appends a JSON
+ * error object as the final line, e.g.
+ *   {"status":"failed","error":"An error occurred while running the query.","error_type":"qp"}
+ * The rows ABOVE it are partial and badly undercounted (observed: 38 vs a true
+ * 153 for Stevenage), so any CSV carrying this sentinel must be treated as a
+ * failure and NEVER parsed or loaded.
+ */
+function looksLikeFailedQuery(raw) {
+  if (!raw) return false;
+  return /"status"\s*:\s*"failed"/i.test(raw) || /"error_type"\s*:\s*"qp"/i.test(raw);
+}
+
+async function captureViaCsv(page, tag, { refetches = 2, refetchDelayMs = 6000 } = {}) {
   const embed = findEmbedFrame(page);
   if (!embed) {
     console.warn('[extract] No Metabase embed frame found — cannot fetch CSV.');
@@ -509,21 +532,47 @@ async function captureViaCsv(page, tag) {
   if (!token) return null;
 
   const csvUrl = `${u.origin}/api/embed/card/${token}/query/csv`;
-  console.log(`[extract] Fetching CSV for tag=${tag} …`);
-  const resp = await page.request.get(csvUrl, { timeout: 120000 }).catch((e) => {
-    console.warn(`[extract] CSV request error (${tag}): ${e.message}`);
-    return null;
-  });
-  if (!resp || !resp.ok()) {
-    console.warn(`[extract] CSV endpoint returned ${resp ? resp.status() : 'no response'} for ${tag}.`);
-    return null;
+
+  // Re-fetch the SAME token a few times on a query-processor failure: the heavy
+  // query often finishes computing (and Metabase caches the result) on a later
+  // hit, so a short wait turns the partial/failed CSV into the full result. If it
+  // still fails after the re-fetches, throw so withRetry() re-runs a fresh Update
+  // (new token) — and, failing that, surfaces the failure instead of loading 0.
+  let raw = null;
+  const attempts = refetches + 1;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    console.log(`[extract] Fetching CSV for tag=${tag} (attempt ${attempt}/${attempts})…`);
+    const resp = await page.request.get(csvUrl, { timeout: 120000 }).catch((e) => {
+      console.warn(`[extract] CSV request error (${tag}): ${e.message}`);
+      return null;
+    });
+    if (!resp || !resp.ok()) {
+      console.warn(`[extract] CSV endpoint returned ${resp ? resp.status() : 'no response'} for ${tag}.`);
+      return null; // endpoint problem — let the caller try the table fallback
+    }
+
+    const text = await resp.text();
+    if (/^\s*</.test(text)) {
+      console.warn('[extract] CSV endpoint returned HTML (not CSV) — falling back to table scrape.');
+      return null;
+    }
+    if (looksLikeFailedQuery(text)) {
+      console.warn(
+        `[extract] CSV for ${tag} carries a Metabase query-processor failure ` +
+          `(attempt ${attempt}/${attempts}); its rows are partial and will NOT be loaded.`
+      );
+      if (attempt < attempts) {
+        await sleep(refetchDelayMs);
+        continue;
+      }
+      throw new QueryProcessorError(
+        `Metabase query failed for ${tag} (query-processor error after ${attempts} CSV fetches).`
+      );
+    }
+    raw = text;
+    break;
   }
 
-  const raw = await resp.text();
-  if (/^\s*</.test(raw)) {
-    console.warn('[extract] CSV endpoint returned HTML (not CSV) — falling back to table scrape.');
-    return null;
-  }
   const filePath = path.join(RUNTIME.downloadsDir, `${tag}_${Date.now()}.csv`);
   fs.mkdirSync(RUNTIME.downloadsDir, { recursive: true });
   fs.writeFileSync(filePath, raw, 'utf8');
@@ -557,10 +606,19 @@ async function captureViaTable(page) {
 }
 
 function parseCsvString(raw) {
-  const records = parseCsv(raw, {
+  // Defensive: drop any trailing Metabase error object (e.g. a query-processor
+  // failure trailer) so a stray JSON line can never break the strict parser.
+  // Real report CSVs never contain such a line; `relax_quotes` covers any other
+  // odd quoting rather than throwing the whole document away.
+  const cleaned = String(raw)
+    .split(/\r?\n/)
+    .filter((ln) => !/^\s*\{\s*"(status|error|error_type)"\s*:/.test(ln))
+    .join('\n');
+  const records = parseCsv(cleaned, {
     columns: true,
     skip_empty_lines: true,
     relax_column_count: true,
+    relax_quotes: true,
     bom: true,
   });
   const columns = records.length ? Object.keys(records[0]) : [];
@@ -594,10 +652,18 @@ async function extractReportForStoreWeek(page, opts) {
   }
   await shot(page, `${tag}_filters`);
 
-  let captured = await captureViaCsv(page, tag).catch((e) => {
+  // A query-processor failure is a HARD failure: the CSV rows are partial and the
+  // DOM table would just scrape 0 for this viz-type report and mask it. Let it
+  // propagate so withRetry() re-runs the whole Update (fresh query), and so a
+  // persistent failure surfaces in the run summary instead of silently loading 0.
+  let captured;
+  try {
+    captured = await captureViaCsv(page, tag);
+  } catch (e) {
+    if (e instanceof QueryProcessorError) throw e;
     console.warn(`[extract] CSV export failed (${e.message}); will try table fallback.`);
-    return null;
-  });
+    captured = null;
+  }
   if (!captured || !captured.rows.length) {
     console.warn(`[extract] CSV returned ${captured ? 0 : 'null'} rows for ${tag} — falling back to DOM table scrape.`);
     captured = await captureViaTable(page);
@@ -619,4 +685,6 @@ module.exports = {
   resultFrame,
   isAllowedNav,
   parseCsvString,
+  looksLikeFailedQuery,
+  QueryProcessorError,
 };
