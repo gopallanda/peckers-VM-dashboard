@@ -51,7 +51,7 @@ const REPORTS = [
     feeds: 'Customer Count',
   },
 
-  // ── Product Performance Dashboard ── Already synced ──────────────────────
+//   // ── Product Performance Dashboard ── Already synced ──────────────────────
   {
     chart: 'Top Menu Items Sold',
     table: 'vm_top_menu_items_sold',
@@ -82,6 +82,14 @@ const REPORTS = [
     table: 'vm_gross_sales_category',
     feeds: 'Category revenue',
   },
+
+  //product level net sales table
+  {
+  chart: 'Net sales per product (with bundle UUID)',   // must match the dropdown text EXACTLY
+  table: 'vm_net_sales_per_product',
+  feeds: 'Item-level NET sales (product_uuid) — Product Performance net revenue',
+},
+
 
   // ── Daypart Analysis Dashboard ── Already synced ─────────────────────────
   {
@@ -114,9 +122,13 @@ const REPORTS = [
 
   chart:'Menu Category Sales',
   table:'vm_menu_category_sales',
-  feeds:'o find meal oxes and platters',
+  feeds:'to find meal boxes and platters',
   },
-
+  {
+    chart: 'Net Sales by Hour',
+    table: 'vm_net_sales_by_hour',
+    feeds: 'hourly net sales of items'
+  },
   // ── Lunch Time Deals (Daypart dashboard) ── NEW ──────────────────────────
   // Pulled per store (extractor applies a single-store filter), so net_sales
   // and counts are per store. Feeds vm_v_lunch_deals / vm_v_lunch_deals_by_item.
