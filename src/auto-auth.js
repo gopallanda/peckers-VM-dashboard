@@ -37,6 +37,23 @@ async function isOnLoginPage(page) {
   return onAuthUrl || pwVisible;
 }
 
+/**
+ * A single snapshot right after `networkidle` is unreliable: VM Hub can render
+ * the /mp1-reporting shell first and only redirect to /login a few seconds
+ * later once its own client-side auth check resolves. Poll for a while so a
+ * delayed redirect (or a delayed report iframe) is caught before we decide.
+ */
+async function waitForAuthOutcome(page, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isOnLoginPage(page)) return 'login';
+    const iframeCount = await page.locator('iframe').count().catch(() => 0);
+    if (iframeCount > 0) return 'authenticated';
+    await page.waitForTimeout(500);
+  }
+  return (await isOnLoginPage(page)) ? 'login' : 'authenticated';
+}
+
 async function main() {
   if (!RUNTIME.email || !RUNTIME.password) {
     throw new Error(
@@ -70,7 +87,7 @@ async function main() {
     await page.goto(REPORTING_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForLoadState('networkidle').catch(() => {});
 
-    if (!(await isOnLoginPage(page))) {
+    if ((await waitForAuthOutcome(page)) === 'authenticated') {
       console.log('[auto-auth] Session valid — saving refreshed auth.json.');
       await context.storageState({ path: RUNTIME.authFile });
       console.log('[auto-auth] Done. Session is ready for sync.');
