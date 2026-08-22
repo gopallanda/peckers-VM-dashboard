@@ -11,6 +11,7 @@
     "auth": "node src/auth.js",
     "auto-auth": "node src/auto-auth.js",
     "sync": "node src/index.js",
+    "sync:daily": "node src/daily/sync.js",
     "import:exec": "node src/import_exec_excel.js",
     "inspect": "node src/inspect.js",
     "api-start": "node server.js",

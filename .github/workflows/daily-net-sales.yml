@@ -1,0 +1,177 @@
+# ===========================================================================
+# Daily net-sales sync (Vita Mojo -> Supabase)
+#
+# Feeds the Sauce Management integration with one net-sales number per store
+# per business day, via vm_daily_net_sales_raw -> vm_v_daily_net_sales ->
+# GET /api/sauce/daily-net-sales on the Cash-Flow app.
+#
+# This workflow is ADDITIVE and completely independent of sync.yml (the weekly
+# VM Analytics sync). The setup steps below are deliberately COPIED from that
+# workflow rather than factored into a shared composite action, because doing
+# so would mean editing sync.yml — and the weekly sync must stay byte-for-byte
+# as it is. If you change a setup step here, it does NOT affect the weekly run.
+#
+# ---------------------------------------------------------------------------
+# THERE IS NO `schedule:` BLOCK, ON PURPOSE
+# ---------------------------------------------------------------------------
+# cron-job.org drives this at 00:30 GMT by calling
+# POST /api/internal/trigger-daily-sync on the Cash-Flow app, which then
+# workflow_dispatches this file. GitHub's own cron is best-effort and can be
+# delayed by many minutes under load, which is unacceptable when the whole run
+# has to be finished before the weekly sync starts at 01:30 UTC.
+# See docs/daily-net-sales.md.
+# ===========================================================================
+
+name: Daily VM Hub → Supabase Net Sales
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Re-run a specific range: first business date (YYYY-MM-DD). Must be set together with end_date.'
+        required: false
+      end_date:
+        description: 'Re-run a specific range: last business date (YYYY-MM-DD). Must be set together with start_date.'
+        required: false
+
+# Never cancel a running daily sync — queue a new one instead. Two concurrent
+# runs would fight over the same VM Hub session.
+concurrency:
+  group: vm-daily
+  cancel-in-progress: false
+
+jobs:
+  daily:
+    name: Daily net sales → Supabase
+    runs-on: ubuntu-latest
+
+    # NON-NEGOTIABLE. This is what guarantees the daily run can never still be
+    # holding a Vita Mojo session when the weekly sync starts at 01:30 UTC.
+    # Triggered at 00:30, a hung run is killed at 00:50 with 40 minutes to
+    # spare. Do not raise this without moving the cron-job.org schedule too.
+    timeout-minutes: 20
+
+    env:
+      VM_HUB_URL: https://hub.vitamojo.com
+      VM_HUB_EMAIL: ${{ secrets.VM_HUB_EMAIL }}
+      VM_HUB_PASSWORD: ${{ secrets.VM_HUB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      STORES: 'Peckers Hitchin,Peckers Stevenage'
+      HEADLESS: '1'
+      DEBUG_SHOTS: '1'
+      # Named DAILY_* so a manual re-run here can never be confused with the
+      # weekly sync's START_DATE/END_DATE, which mean a Mon–Sun week window.
+      DAILY_START_DATE: ${{ github.event.inputs.start_date || '' }}
+      DAILY_END_DATE: ${{ github.event.inputs.end_date || '' }}
+      DAILY_LOOKBACK_DAYS: '3'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium + system deps
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore saved VM Hub session (optional)
+        # VM_AUTH_JSON holds the output of `context.storageState()` saved after
+        # running `npm run auth` locally. Restoring it lets auto-auth skip the
+        # password flow when the session is still valid (faster, more reliable).
+        # If the secret is absent or the session has expired, auto-auth falls
+        # back to email+password login automatically.
+        run: |
+          if [ -n "${{ secrets.VM_AUTH_JSON }}" ]; then
+            printf '%s' "${{ secrets.VM_AUTH_JSON }}" > auth.json
+            echo "[setup] Restored auth.json from VM_AUTH_JSON secret."
+          else
+            echo "[setup] VM_AUTH_JSON not set — auto-auth will log in fresh."
+          fi
+
+      - name: Authenticate with VM Hub
+        # Tries the restored session; falls back to email+password if expired.
+        # Saves a refreshed auth.json on success (used immediately by the sync).
+        run: node src/auto-auth.js
+
+      - name: Resolve business dates
+        # Ask the real config for the dates rather than recomputing them in
+        # shell, so the alert email and the job summary can never disagree with
+        # what the sync actually pulled (Europe/London, newest first).
+        id: dates
+        run: |
+          DATES=$(node -e "console.log(require('./src/daily/config').getBusinessDates().map(d=>d.businessDate).join(', '))")
+          echo "business_dates=$DATES" >> $GITHUB_OUTPUT
+          echo "[setup] Business dates to pull: $DATES"
+
+      - name: Run daily net-sales sync
+        run: npm run sync:daily
+
+      - name: Upload debug artefacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-daily-debug-${{ github.run_id }}
+          path: |
+            debug/
+            downloads/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Email alert on failure
+        # GitHub's built-in notifications are unreliable for workflow_dispatch
+        # runs (they are attributed to the dispatcher, and nobody watches the
+        # bot account), so the alert is sent explicitly over SMTP. This is the
+        # FIRST line of defence; /api/sauce/health is the second, because
+        # cron-job.org only ever sees the 202 from the trigger endpoint and can
+        # never know whether the workflow itself succeeded.
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_HOST }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          to: ${{ secrets.ALERT_EMAIL_TO }}
+          from: Peckers VM Daily Sync <${{ secrets.SMTP_USER }}>
+          subject: '[Peckers] Daily net-sales sync FAILED'
+          body: |
+            The daily Vita Mojo net-sales sync failed.
+
+            Business dates attempted : ${{ steps.dates.outputs.business_dates || 'not resolved (failed before the date step)' }}
+            Manual range inputs      : ${{ github.event.inputs.start_date || 'none' }} .. ${{ github.event.inputs.end_date || 'none' }}
+            Run URL                  : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Sauce Management will keep serving whatever was last synced, and
+            /api/sauce/health will report stale once the last successful run is
+            more than 26 hours old.
+
+            Nothing was overwritten with bad data: a date that fails to extract
+            is skipped rather than loaded, so the previous good figure for that
+            day is left standing.
+
+            Debug screenshots and the captured CSVs are attached to the run as
+            artefacts (7-day retention).
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### ✅ Daily net-sales sync completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Daily net-sales sync failed — check logs above" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Completed at | $(date -u '+%Y-%m-%d %H:%M UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Business dates | ${{ steps.dates.outputs.business_dates || 'not resolved' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| DAILY_LOOKBACK_DAYS | ${DAILY_LOOKBACK_DAYS} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Manual start_date | ${DAILY_START_DATE:-none} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Manual end_date | ${DAILY_END_DATE:-none} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stores | ${STORES} |" >> $GITHUB_STEP_SUMMARY
