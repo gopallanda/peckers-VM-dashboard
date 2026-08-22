@@ -25,48 +25,68 @@ API.
 
 ## 1. How it fits together
 
-> **2026-08-22 — GitHub Actions removed from the daily path.** The daily sync
-> now runs **on the same host that serves this API**, as a child process of
-> `server.js`. cron-job.org calls the trigger route directly; there is no
-> `workflow_dispatch`, no `GH_DISPATCH_TOKEN`, and no SMTP alert. The
-> **weekly** sync is unchanged and still runs on GitHub Actions via `sync.yml`.
+> **Superseded twice — read this before the diagram.** On 2026-08-22 the daily
+> sync was moved off GitHub Actions onto the API host. It has since moved
+> **back**, because that arrangement cannot be run for free: one box doing both
+> jobs needs ~1 GB of RAM for Chromium, and the cheapest Render plan with that
+> much RAM is ~$25/mo. The two jobs are now split by resource profile.
+>
+> The **weekly** sync was never touched and still runs on `sync.yml`.
+
+The system does two jobs with opposite requirements, so they live in two
+places:
+
+| Job | Where | Why there |
+|---|---|---|
+| **Scrape** — Playwright + Chromium, ~1 GB | GitHub Actions | free runners already install Chromium |
+| **Serve** — Express + `pg`, ~80 MB | Render free tier | fits in 512 MB with room to spare |
 
 ```
-cron-job.org                                    cron-job.org
-  job 1 — 00:30 daily                             job 2 — hourly
-      │                                                 │
-      │ POST /api/internal/trigger-daily-sync           │ GET /api/internal/health-check
-      │ Bearer DAILY_SYNC_TRIGGER_SECRET                │ Bearer DAILY_SYNC_TRIGGER_SECRET
-      │                                                 │ 503 when stale ──▶ cron-job.org emails you
-      ▼                                                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│  HOST  ·  node server.js  ·  PUBLIC_DEPLOY=1                 │
-│                                                              │
-│   trigger route ──spawn──▶ node src/daily/sync.js            │
-│   (returns 202 at once)    (Playwright, ~1-2 min)            │
-│                                    │                         │
-│                                    ▼                         │
-│                            VM Analytics Supabase             │
-│                            vm_daily_net_sales_raw            │
-│                            vm_v_daily_net_sales              │
-│                            vm_daily_sync_runs                │
-│                                    │                         │
-│   GET /api/sauce/daily-net-sales ◀─┘ (reads the view only)   │
-└──────────────────────────────────────────────────────────────┘
+cron-job.org                cron-job.org              cron-job.org
+ job 1 — 00:30 daily         job 2 — every 10 min      job 3 — hourly
+      │                           │                         │
+      │ POST GitHub REST API      │ GET /api/health         │ GET /api/internal/health-check
+      │ workflow dispatch         │ (keep-alive, no auth)   │ Bearer DAILY_SYNC_TRIGGER_SECRET
+      │ Bearer <PAT>              │                         │ 503 when stale ─▶ emails you
+      ▼                           ▼                         ▼
+┌──────────────────────┐   ┌──────────────────────────────────────────┐
+│ GitHub Actions       │   │ RENDER (free)  ·  node server.js         │
+│ daily-net-sales.yml  │   │ PUBLIC_DEPLOY=1  ·  SCRAPE_ENABLED=0     │
+│                      │   │                                          │
+│ Chromium ─▶ VM Hub   │   │  GET /api/sauce/daily-net-sales          │
+│      │               │   │  GET /api/sauce/health                   │
+└──────┼───────────────┘   └──────────────────┬───────────────────────┘
+       │                                      │ reads the view only
+       ▼   writes                     reads   ▼
+   ┌───────────────────────────────────────────────────┐
+   │  VM Analytics Supabase                            │
+   │  vm_daily_net_sales_raw → vm_v_daily_net_sales    │
+   │  vm_daily_sync_runs                               │
+   └───────────────────────────────────────────────────┘
                           ▲
-                          │ Bearer SAUCE_API_KEY
+                          │ Bearer SAUCE_API_KEY (server-to-server)
                     Sauce Management
 ```
 
-**cron-job.org is a scheduler, not a host.** All it does is send an HTTP
-request on a timer — it cannot run Node and it cannot run Playwright. That is
-the whole reason a host is required: something has to be listening at a public
-HTTPS URL for cron-job.org to call, and that same something runs the scrape.
+The two halves are decoupled by the database, not by any API call between
+them: the scraper only writes, the server only reads. Neither knows the other
+exists, which is why moving the scrape between hosts has never required a
+change to the Sauce-facing contract.
 
-Why the trigger returns **202 immediately** instead of running the scrape
-inside the request: cron-job.org aborts a request after 30s on the free tier,
-and a run takes 1–2 minutes. A synchronous endpoint would be recorded as failed
-every single night even when it worked perfectly.
+**cron-job.org is a scheduler, not a host.** All it does is send an HTTP
+request on a timer — it cannot run Node and it cannot run Playwright. Under
+this topology it never needs to: job 1 asks *GitHub* to run the scrape.
+
+Why `SCRAPE_ENABLED=0` on Render: `POST /api/internal/trigger-daily-sync` is
+still routed there, and without the flag it would spawn a child that cannot
+find a browser, fail, and write a bogus `'failed'` row into the run ledger —
+which would then make the health-check alarm on a feed that is perfectly fine.
+
+Why the trigger route still exists at all: it is the whole daily path on a
+Docker host with Chromium (see §10), and the 202-immediately design is what
+makes that work — cron-job.org aborts a request after 30s on the free tier and
+a run takes 1–2 minutes, so a synchronous endpoint would be recorded as failed
+every night even when it worked perfectly.
 
 Why the scrape is a **child process** rather than an in-process call:
 `src/daily/sync.js` runs on import and calls `process.exit(1)` on failure —
@@ -83,33 +103,54 @@ is also why the runner carries a hard 20-minute watchdog
 
 ## 2. The cron-job.org jobs
 
-Create **two** jobs. The second one is not optional — see §6 for why.
+Create **three** jobs. None of them is decoration — each covers a failure the
+other two cannot see.
 
 ### Job 1 — the nightly trigger
 
 | Field | Value |
 |---|---|
 | Title | `Peckers daily sales sync` |
-| URL | `https://<your-host>/api/internal/trigger-daily-sync` |
+| URL | `https://api.github.com/repos/<owner>/<repo>/actions/workflows/daily-net-sales.yml/dispatches` |
 | Method | `POST` |
-| Header | `Authorization: Bearer <DAILY_SYNC_TRIGGER_SECRET>` |
+| Headers | `Authorization: Bearer <GitHub PAT>`<br>`Accept: application/vnd.github+json`<br>`X-GitHub-Api-Version: 2022-11-28`<br>`Content-Type: application/json` |
+| Body | `{"ref":"main"}` |
 | Schedule | **00:30, daily** |
 | Timezone | `Europe/London` |
 | Failure notification | **Enable it.** |
 
-Expected response: `202`. A `409` means the previous night's run is somehow
-still going after ~24 hours; cron-job.org will flag it, which is intended.
+Expected response: **`204 No Content`**. A `401` means the PAT has expired —
+fine-grained tokens last at most a year, and this job is how you find out.
 
-The endpoint returns **`202 Accepted` immediately** and does not wait for the
-scrape. A green history on this job therefore means "the sync was requested",
-**not** "the sync succeeded". That is what Job 2 is for.
+The dispatch only **queues** a run. A green history here means "the run was
+requested", **not** "the sync succeeded". Jobs 2 and 3 cover the rest.
 
-### Job 2 — the staleness alarm
+### Job 2 — the keep-alive
+
+| Field | Value |
+|---|---|
+| Title | `Peckers API keep-alive` |
+| URL | `https://<your-render-app>.onrender.com/api/health` |
+| Method | `GET` |
+| Header | none — this route is deliberately unauthenticated |
+| Schedule | **every 10 minutes** |
+| Failure notification | **Off.** This is a heartbeat, not an alarm. |
+
+Render's free tier sleeps after 15 minutes idle and takes ~50s to wake. Sauce
+Management polls once a day, so without this **every one of their requests
+would hit a cold start** and look like a broken integration.
+
+`/api/health` returns a static `{"status":"ok"}` and never touches Postgres, so
+pinging it costs no database connections. Budget check: 730 hours in a month
+against Render's 750 free instance-hours — it fits, but it means this can be
+your **only** free Render service.
+
+### Job 3 — the staleness alarm
 
 | Field | Value |
 |---|---|
 | Title | `Peckers daily sales — stale check` |
-| URL | `https://<your-host>/api/internal/health-check` |
+| URL | `https://<your-render-app>.onrender.com/api/internal/health-check` |
 | Method | `GET` |
 | Header | `Authorization: Bearer <DAILY_SYNC_TRIGGER_SECRET>` |
 | Schedule | **hourly** (or once a day around 08:00 — anything that gets seen) |
@@ -117,9 +158,11 @@ scrape. A green history on this job therefore means "the sync was requested",
 | Failure notification | **Enable it.** |
 
 This route returns `503` when no successful run has completed in more than 26
-hours, so cron-job.org's own failure email becomes the alarm. It replaces the
-SMTP failure alert the GitHub Actions workflow used to send, at no cost and
-with nothing new to configure.
+hours, so cron-job.org's own failure email becomes the alarm.
+
+It is the only thing that catches a run which **never started** — the workflow's
+SMTP alert can only fire for a run that started and then failed, and job 1 sees
+nothing but the `204`. The two alerts are complementary, not redundant.
 
 ### Worked example
 
@@ -147,28 +190,52 @@ local trading-day concept.
 
 ## 3. Environment variables
 
-Everything the daily sync needs now lives on **one host**, set through that
-host's environment-variable UI (or a `.env` file on a VPS). There are no
-GitHub Actions secrets for the daily sync any more.
+Configuration is split the same way the work is: the **scrape** credentials are
+GitHub Actions secrets, the **serve** credentials are Render environment
+variables. Only `SUPABASE_DB_URL` appears in both, because both halves talk to
+the same database.
 
-### Required on the host
+### Required as GitHub Actions secrets (the scrape)
+
+| Secret | Purpose |
+|---|---|
+| `VM_HUB_EMAIL`, `VM_HUB_PASSWORD` | VM Hub login — same values the weekly sync uses |
+| `SUPABASE_DB_URL` | writes the scraped rows |
+| `VM_AUTH_JSON` | optional saved session; auto-auth falls back to password login |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `ALERT_EMAIL_TO` | the failure alert. **Without these the alert step itself errors** and a failed sync tells you nothing. |
+
+The GitHub PAT that lets cron-job.org fire the workflow is **not** a repo
+secret — it lives only in cron-job.org.
+
+### Required on the host (the API)
 
 | Variable | Purpose | How to get it |
 |---|---|---|
-| `VM_HUB_EMAIL` | VM Hub login | same value the weekly sync uses |
-| `VM_HUB_PASSWORD` | VM Hub login | same value the weekly sync uses |
-| `SUPABASE_DB_URL` | reads and writes VM Analytics Postgres | session-pooler URI; percent-encode `@ : / ? # [ ] %` in the password |
-| `STORES` | which stores to pull | `Peckers Hitchin,Peckers Stevenage` |
+| `SUPABASE_DB_URL` | reads VM Analytics Postgres | session-pooler URI; percent-encode `@ : / ? # [ ] %` in the password |
 | `SAUCE_API_KEY` | bearer token the **teammate** sends | `openssl rand -hex 32` |
 | `DAILY_SYNC_TRIGGER_SECRET` | bearer token **cron-job.org** sends | `openssl rand -hex 32` — a *different* value |
 | `PUBLIC_DEPLOY` | `1` on any internet-facing host | see the warning below |
-| `HEADLESS` | must be `1` on a server | `1` |
+| `SCRAPE_ENABLED` | `0` on a host with no Chromium | see §1 |
 | `TZ` | log timestamps | `Europe/London` |
+| `API_HOST` | `0.0.0.0` — required in a container | `0.0.0.0` |
+
+`VM_HUB_EMAIL`, `VM_HUB_PASSWORD`, `STORES` and `HEADLESS` are **not** needed
+on the Render host under the split topology — nothing there logs into VM Hub.
+They are only required on a Docker host that runs the scrape itself (§10).
+
+Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` too. `playwright` is a production
+dependency, so a plain `npm ci` tries to pull ~500 MB of browsers into a
+512 MB instance and the build dies. The API path never launches one.
 
 > **`SAUCE_API_KEY` and `DAILY_SYNC_TRIGGER_SECRET` must be two different
 > values.** `SAUCE_API_KEY` only reads sales figures; `DAILY_SYNC_TRIGGER_SECRET`
-> can start a VM Hub scrape. Sharing one token would let the teammate kick off
-> scrapes, and rotating the teammate's key would silently kill the nightly cron.
+> reaches `/api/internal/*`. Sharing one token would let the teammate hit the
+> internal routes, and rotating their key would silently kill the nightly alarm.
+>
+> Both are **shared secrets**: the same string sits on Render (the expected
+> value, compared by `bearerGuard`) and in the caller's config (the value
+> sent). Omitting `SAUCE_API_KEY` on Render does not open the route — it makes
+> every request return **500**, and the feed is dead.
 
 > **`PUBLIC_DEPLOY=1` is a security requirement, not a preference.**
 > `/api/stores`, `/api/weeks` and `/api/kpis/*` have **no authentication at

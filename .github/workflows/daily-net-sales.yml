@@ -14,12 +14,25 @@
 # ---------------------------------------------------------------------------
 # THERE IS NO `schedule:` BLOCK, ON PURPOSE
 # ---------------------------------------------------------------------------
-# cron-job.org drives this at 00:30 GMT by calling
-# POST /api/internal/trigger-daily-sync on the Cash-Flow app, which then
-# workflow_dispatches this file. GitHub's own cron is best-effort and can be
-# delayed by many minutes under load, which is unacceptable when the whole run
-# has to be finished before the weekly sync starts at 01:30 UTC.
-# See docs/daily-net-sales.md.
+# cron-job.org drives this at 00:30 Europe/London by POSTing straight to the
+# GitHub REST API:
+#
+#   POST https://api.github.com/repos/<owner>/<repo>/actions/workflows/
+#        daily-net-sales.yml/dispatches      body: {"ref":"main"}
+#        header: Authorization: Bearer <fine-grained PAT, Actions: RW>
+#
+# GitHub's own `schedule:` cron is best-effort and can be delayed by many
+# minutes under load, which is unacceptable when the whole run has to finish
+# before the weekly sync starts at 01:30 UTC. An external scheduler firing a
+# workflow_dispatch is prompt.
+#
+# The 204 that cron-job.org sees means "the run was QUEUED", not "the sync
+# succeeded". Two things cover the gap:
+#   - the SMTP alert step below, for a run that starts and then fails
+#   - GET /api/internal/health-check on the Render API, polled hourly by a
+#     second cron-job.org job, for a run that never started at all
+#
+# See docs/deploying-the-daily-feed.md.
 # ===========================================================================
 
 name: Daily VM Hub → Supabase Net Sales

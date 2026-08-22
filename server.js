@@ -19,11 +19,17 @@ const path = require('path');
 const apiRoutes = require('./src/api/routes');
 
 const app = express();
-const PORT = process.env.API_PORT || 3000;
+
+// PORT before API_PORT, deliberately. Render, Railway, Fly and Heroku all
+// inject PORT and route traffic to whatever they injected — a service that
+// ignores it binds the wrong port and the platform reports the deploy as
+// failed with no useful error. API_PORT stays as the local/self-hosted knob
+// (it is what .env.example documents), so `npm run api-start` is unchanged.
+const PORT = process.env.PORT || process.env.API_PORT || 3000;
 
 // Bind to 0.0.0.0 in a container — the default would only accept connections
-// from inside the container itself and the platform's router could never reach
-// it. Most hosts also inject their own PORT, which is why it is read first.
+// from inside the container itself and the platform's router could never
+// reach it.
 const HOST = process.env.API_HOST || '0.0.0.0';
 
 // ---------------------------------------------------------------------------

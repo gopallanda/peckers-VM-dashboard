@@ -18,3 +18,9 @@ Thumbs.db
 *.docx
 *.csv
 
+# ...but the runbooks in docs/ ARE the deployment instructions and must be in
+# the repo. The blanket *.md above meant docs/deploying-the-daily-feed.md only
+# ever existed on one laptop, which is exactly where a runbook is useless.
+!docs/*.md
+!README.md
+

@@ -275,8 +275,24 @@ router.get('/sauce/health', requireSauceApiKey, asyncHandler(async (req, res) =>
 //   { "start_date": "2026-08-20", "end_date": "2026-08-20" }
 // Both or neither. Re-running is always safe: the load is idempotent per
 // (store, date). See docs/daily-net-sales.md section 7.
+//
+// NOT AVAILABLE ON A SCRAPE-LESS HOST. Set SCRAPE_ENABLED=0 wherever this
+// server runs without Chromium (the free Render deployment, where the nightly
+// scrape happens on GitHub Actions instead). The child process would spawn,
+// fail to find a browser, and record a bogus 'failed' run in the ledger —
+// which would then make /api/internal/health-check alarm on a feed that is
+// actually healthy. A 501 says plainly that this host does not do that job.
 // ---------------------------------------------------------------------------
+const SCRAPE_ENABLED = process.env.SCRAPE_ENABLED !== '0';
+
 router.post('/internal/trigger-daily-sync', requireTriggerSecret, (req, res) => {
+  if (!SCRAPE_ENABLED) {
+    return res.status(501).json({
+      error: 'this host does not run the scrape (SCRAPE_ENABLED=0)',
+      hint: 'the nightly sync runs on GitHub Actions — trigger it with a workflow_dispatch on daily-net-sales.yml',
+    });
+  }
+
   const { start_date: startDate, end_date: endDate } = req.body || {};
 
   if ((startDate && !endDate) || (endDate && !startDate)) {
