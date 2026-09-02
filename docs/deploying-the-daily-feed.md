@@ -40,7 +40,7 @@ not use the `Dockerfile` at all — Render runs the native Node runtime.
 | Database | Supabase | already yours | — |
 | Scrape | GitHub Actions | 2,000 min/mo (private repo) | ~250 min/mo |
 | API host | Render | 512 MB, 750 instance-hrs/mo | ~80 MB, ~730 hrs |
-| Scheduler | cron-job.org | 50 jobs | 3 jobs |
+| Scheduler | cron-job.org | 50 jobs | 4 jobs |
 | Alerting | cron-job.org email + Gmail SMTP | free | — |
 
 ---
@@ -99,8 +99,9 @@ tokens → **Fine-grained tokens** → Generate new token:
 Copy it now — GitHub shows it once. It goes into cron-job.org only, never into
 a repo secret and never onto Render.
 
-> When it expires, cron-job.org job 1 starts returning `401` and emails you.
-> That is by design, but put a calendar reminder in anyway.
+> When it expires, cron-job.org jobs 1 and 4 start returning `401` and email
+> you. That is by design, but put a calendar reminder in anyway. One token
+> covers both — fine-grained PATs scope to a repository, not to a workflow.
 
 ---
 
@@ -245,8 +246,11 @@ returns 404 rather than 403 for permission failures on private repos.
 
 ## 8. cron-job.org setup
 
-Sign up at <https://cron-job.org>. Create **three** jobs. Headers go under the
+Sign up at <https://cron-job.org>. Create **four** jobs. Headers go under the
 job's **Advanced** tab.
+
+Jobs 1 and 4 both dispatch a GitHub workflow and are identical apart from the
+workflow filename in the URL and the schedule. They share one PAT.
 
 ### Job 1 — nightly trigger
 
@@ -296,7 +300,38 @@ Returns `503` when nothing has succeeded in 26 hours. This is the only thing
 that catches a run that **never started** — the workflow's SMTP alert can only
 fire for a run that started and then failed, and job 1 sees nothing but a `204`.
 
-Use **"Run now"** on job 1 once and confirm the history shows `204`.
+### Job 4 — weekly trigger
+
+Replaces the `schedule:` block that used to live in `sync.yml`. GitHub's own
+cron delayed the 2026-08-31 weekly run by over five hours; a dispatch is prompt.
+
+| Field | Value |
+|---|---|
+| Title | `Peckers weekly sales sync` |
+| URL | `https://api.github.com/repos/gopallanda/peckers-VM-dashboard/actions/workflows/sync.yml/dispatches` |
+| Method | `POST` |
+| Headers | `Authorization: Bearer <PAT>`<br>`Accept: application/vnd.github+json`<br>`X-GitHub-Api-Version: 2022-11-28`<br>`Content-Type: application/json` |
+| Request body | `{"ref":"main"}` |
+| Schedule | Mondays at **01:30** |
+| Timezone | **`UTC`** — not `Europe/London` |
+| Notify on failure | **on** |
+
+Expected response `204`.
+
+The timezone is the one field that differs from every other job here. `sync.yml`
+ran at 01:30 **UTC** year-round; picking `Europe/London` would shift it an hour
+at each DST changeover and eat into the gap after the daily run. Leave it on UTC.
+
+A body of just `{"ref":"main"}` is correct — `sync.yml` defaults `weeks_back` to
+`1`, the last complete Mon–Sun week, which is exactly what the old cron did.
+
+> **Unlike the daily, this workflow has no SMTP failure step.** cron-job.org
+> only ever sees the `204`, and nothing else watches the weekly run, so a sync
+> that starts and then fails is silent. Check the Actions tab, or add a
+> `dawidd6/action-send-mail` step to `sync.yml` mirroring the daily one — all
+> five `SMTP_*`/`ALERT_*` secrets already exist.
+
+Use **"Run now"** on jobs 1 and 4 once each and confirm the history shows `204`.
 
 ---
 
@@ -372,9 +407,11 @@ over the same VM Hub session.
 
 - **Rotating the teammate's key:** change `SAUCE_API_KEY` on Render, restart,
   send them the new value. Nothing else is affected.
-- **The weekly sync is untouched.** It still runs on `sync.yml` at 01:30 UTC
-  Mondays. The daily run's 20-minute cap exists to guarantee it has finished
-  before then.
+- **The weekly sync** still runs on `sync.yml` at 01:30 UTC Mondays, but is now
+  fired by cron-job.org job 4 rather than a GitHub `schedule:` block. The daily
+  run's 20-minute cap exists to guarantee it has finished before then — and that
+  margin is now exact rather than accidental, because a dispatched run starts on
+  time instead of drifting later under GitHub's queue.
 - **Supabase free projects pause after ~7 days of inactivity.** The nightly
   writes prevent this — but note the compounding failure: ignore the staleness
   alarm for a week and the database pauses, taking the API down too.

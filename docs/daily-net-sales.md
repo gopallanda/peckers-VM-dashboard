@@ -106,6 +106,10 @@ is also why the runner carries a hard 20-minute watchdog
 Create **three** jobs. None of them is decoration — each covers a failure the
 other two cannot see.
 
+(A fourth cron-job.org job, documented in `deploying-the-daily-feed.md` §8,
+dispatches the *weekly* `sync.yml` for the same reason. It is not part of this
+feed — but it shares the same PAT, so revoking that token breaks both.)
+
 ### Job 1 — the nightly trigger
 
 | Field | Value |

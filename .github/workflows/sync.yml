@@ -1,9 +1,42 @@
+# ===========================================================================
+# Weekly VM Analytics sync (Vita Mojo -> Supabase)
+#
+# ---------------------------------------------------------------------------
+# THERE IS NO `schedule:` BLOCK, ON PURPOSE
+# ---------------------------------------------------------------------------
+# This workflow used to carry `- cron: '30 1 * * 1'` (Monday 01:30 UTC =
+# 07:00 IST). GitHub's own `schedule:` cron is best-effort and is queued behind
+# whatever else the hosted runners are doing — the 2026-08-31 run started more
+# than five hours late. :30-past slots are among the worst affected.
+#
+# cron-job.org now drives this at 01:30 UTC every Monday by POSTing straight to
+# the GitHub REST API, exactly as it already does for daily-net-sales.yml:
+#
+#   POST https://api.github.com/repos/<owner>/<repo>/actions/workflows/
+#        sync.yml/dispatches                 body: {"ref":"main"}
+#        header: Authorization: Bearer <fine-grained PAT, Actions: RW>
+#
+# A dispatch is an API call rather than a queued event, so it fires promptly.
+# It also sidesteps GitHub auto-disabling scheduled workflows after 60 days of
+# repo inactivity.
+#
+# TIMING — the daily net-sales run must never overlap this one. It fires at
+# 00:30 Europe/London and is hard-killed at 00:50 by its `timeout-minutes: 20`.
+# Now that this run actually starts at 01:30 UTC instead of drifting later, the
+# gap is 40 minutes in GMT (100 in BST) and is no longer accidental. Keep this
+# job on the **UTC** timezone in cron-job.org, and do not raise the daily's
+# timeout without moving this schedule too.
+#
+# The 204 that cron-job.org sees means "the run was QUEUED", not "the sync
+# succeeded" — this workflow has no failure-alert step, so check the Actions
+# tab (or add one, mirroring daily-net-sales.yml).
+#
+# See docs/deploying-the-daily-feed.md section 8, job 4.
+# ===========================================================================
+
 name: Weekly VM Hub → Supabase Sync
 
 on:
-  schedule:
-    # Monday 01:30 UTC = 07:00 IST (UTC+5:30)
-    - cron: '30 1 * * 1'
   workflow_dispatch:
     inputs:
       start_date:
