@@ -41,8 +41,11 @@ const HOST = process.env.API_HOST || '0.0.0.0';
 // the hostname — no token, no login, from any browser on the internet.
 //
 // The Sauce Management integration does not need any of those routes. It only
-// calls /api/sauce/*, which is bearer-authenticated. So on a public host we
-// serve the authenticated routes and nothing else.
+// calls /api/sauce/*, and the live feed only /api/live/*, both bearer-
+// authenticated. So on a public host we serve the authenticated routes and
+// nothing else: /sauce/ (SAUCE_API_KEY), /live/ (LIVE_SALES_API_KEY) and
+// /internal/ (DAILY_SYNC_TRIGGER_SECRET), plus the unauthenticated /health
+// keep-alive, which returns no data.
 //
 // Unset (the default) preserves the existing local behaviour exactly, so
 // `npm run api-start` and the dashboard keep working as they always have.
@@ -76,7 +79,7 @@ app.use((req, res, next) => {
 if (PUBLIC_DEPLOY) {
   // NOTE: these are mount-relative. Inside `app.use('/api', ...)` Express
   // strips the mount path, so req.path here is '/sauce/...', NOT '/api/sauce/...'.
-  const OPEN_PREFIXES = ['/sauce/', '/internal/'];
+  const OPEN_PREFIXES = ['/sauce/', '/live/', '/internal/'];
   app.use('/api', (req, res, next) => {
     if (req.path === '/health' || OPEN_PREFIXES.some((p) => req.path.startsWith(p))) {
       return next();
@@ -139,5 +142,7 @@ app.listen(PORT, HOST, () => {
   console.log('  GET  /api/sauce/health                  → feed status  [Bearer SAUCE_API_KEY]');
   console.log('  POST /api/internal/trigger-daily-sync   → run sync now [Bearer DAILY_SYNC_TRIGGER_SECRET]');
   console.log('  GET  /api/internal/health-check         → 503 if stale [Bearer DAILY_SYNC_TRIGGER_SECRET]');
+  console.log('  GET  /api/live/gross-sales              → today, live   [Bearer LIVE_SALES_API_KEY]');
+  console.log('  GET  /api/internal/live-health          → 503 if broken [Bearer DAILY_SYNC_TRIGGER_SECRET]');
   console.log('');
 });

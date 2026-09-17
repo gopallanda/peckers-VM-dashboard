@@ -13,6 +13,7 @@ const express = require('express');
 const kpiService = require('./kpi-service');
 const dailySalesService = require('./daily-sales-service');
 const dailySyncRunner = require('./daily-sync-runner');
+const liveGross = require('../live/intraday-gross');
 
 const router = express.Router();
 
@@ -31,11 +32,17 @@ const asyncHandler = (fn) => (req, res, next) => {
 // needs this from a browser it must proxy through its own backend — putting
 // SAUCE_API_KEY in a client bundle would publish it.
 //
-// Two DIFFERENT tokens, deliberately:
+// Three DIFFERENT tokens, deliberately:
 //   SAUCE_API_KEY             — read-only sales data, held by the teammate
 //   DAILY_SYNC_TRIGGER_SECRET — can start a scrape, held by cron-job.org
+//   LIVE_SALES_API_KEY        — today's live gross sales, held by the live consumer
 // Sharing one token would mean the teammate could kick off VM Hub scrapes, and
 // that rotating the teammate's key would silently break the nightly cron.
+//
+// The live key is separate from SAUCE_API_KEY because every uncached live
+// request logs into Vita Mojo's ThoughtSpot with our VM Hub session. It can be
+// handed out (or revoked) on its own without touching the nightly feed, and a
+// leaked Sauce key cannot be used to hammer VM Hub.
 // ---------------------------------------------------------------------------
 function bearerGuard(envName) {
   return function guard(req, res, next) {
@@ -63,6 +70,7 @@ function bearerGuard(envName) {
 
 const requireSauceApiKey = bearerGuard('SAUCE_API_KEY');
 const requireTriggerSecret = bearerGuard('DAILY_SYNC_TRIGGER_SECRET');
+const requireLiveApiKey = bearerGuard('LIVE_SALES_API_KEY');
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -362,6 +370,80 @@ router.get('/internal/health-check', requireTriggerSecret, asyncHandler(async (r
       last_run_this_process: dailySyncRunner.getLastRun(),
     },
   });
+}));
+
+// ---------------------------------------------------------------------------
+// GET /api/live/gross-sales
+//
+// Today's gross sales so far (Europe/London business date), per store, with an
+// hourly timeline. Requires `Authorization: Bearer <LIVE_SALES_API_KEY>`.
+// See docs/live-gross-sales.md for the contract.
+//
+// Read live from Vita Mojo's ThoughtSpot over plain HTTP (no browser), cached
+// in memory for 5 minutes. VM Hub itself lags 15-30 minutes behind the till.
+//
+// When ThoughtSpot is unreachable but a result for the same business date is
+// under 3 hours old, that is returned with `stale: true` and an `error` code
+// instead of failing. Otherwise 503 { error, code } — never zeros, for the same
+// reason the daily feed never returns zeros for a missing day.
+// ---------------------------------------------------------------------------
+router.get('/live/gross-sales', requireLiveApiKey, asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    return res.json(await liveGross.getLiveGrossSales());
+  } catch (err) {
+    return res.status(503).json({
+      error: 'live gross sales unavailable',
+      code: err.code || 'LIVE_UNAVAILABLE',
+    });
+  }
+}));
+
+// ---------------------------------------------------------------------------
+// GET /api/internal/live-health
+//
+// The alarm for the live feed, polled by cron-job.org (any non-2xx emails).
+// Requires `Authorization: Bearer <DAILY_SYNC_TRIGGER_SECRET>`.
+//
+//  - 200 if a live fetch succeeded in the last 90 minutes, or it is outside
+//    trading hours (Europe/London 00:00-10:30) — nobody is reading it then,
+//    and the refresh token should not be exercised needlessly overnight.
+//  - Otherwise it does a fetch itself: 200 if that works, 503 with the code if
+//    not. A stale-while-error answer counts as a FAILURE here: the consumer is
+//    being served old data and the refresh token may be dead.
+//
+// Last-success time is in-process memory, so after a Render restart/spin-down
+// the first poll in trading hours always performs a real fetch. That is the
+// point: it proves the token still works on a cold start.
+// ---------------------------------------------------------------------------
+const LIVE_HEALTH_WINDOW_MS = 90 * 60 * 1000;
+
+router.get('/internal/live-health', requireTriggerSecret, asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const status = liveGross.getLiveStatus();
+  const london = liveGross.londonParts(new Date());
+  const tradingHours = london.hour * 60 + london.minute >= 10 * 60 + 30;
+  const recent = status.lastSuccessAt && Date.now() - Date.parse(status.lastSuccessAt) < LIVE_HEALTH_WINDOW_MS;
+
+  if (recent || !tradingHours) {
+    return res.json({ ok: true, lastSuccessAt: status.lastSuccessAt, tradingHours, checked: false });
+  }
+
+  try {
+    const result = await liveGross.getLiveGrossSales();
+    if (result.stale) {
+      return res.status(503).json({ ok: false, code: result.error, lastSuccessAt: status.lastSuccessAt, stale: true });
+    }
+    return res.json({ ok: true, lastSuccessAt: result.asOf, tradingHours, checked: true });
+  } catch (err) {
+    const after = liveGross.getLiveStatus();
+    return res.status(503).json({
+      ok: false,
+      code: err.code || 'LIVE_UNAVAILABLE',
+      lastSuccessAt: after.lastSuccessAt,
+      lastErrorAt: after.lastErrorAt,
+    });
+  }
 }));
 
 // ---------------------------------------------------------------------------

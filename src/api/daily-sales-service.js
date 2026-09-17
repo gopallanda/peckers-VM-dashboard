@@ -132,6 +132,8 @@ async function closePool() {
 }
 
 module.exports = {
+  // Shared with src/live/token-store.js so the server holds ONE pool, not two.
+  getPool,
   getOne,
   getRange,
   getFeedStatus,
