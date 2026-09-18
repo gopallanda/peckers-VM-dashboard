@@ -13,7 +13,7 @@
 
 const { REPORTS, STORES, RUNTIME, getWeeks } = require('./config');
 const { withSession, extractReportForStoreWeek } = require('./extract');
-const { loadStore, closePool } = require('./load');
+const { loadStore, closePool, refreshSnapshots } = require('./load');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -111,6 +111,42 @@ async function main() {
     }
   });
 
+  // ---- Snapshot refresh (once, after ALL loads have committed) -----------
+  // A snapshot of partial data is worse than a stale one, so skip on any
+  // failure. A refresh error never touches the committed load; it only makes
+  // the run exit non-zero so it isn't silent.
+  let refreshFailed = false;
+  if (anyFailed) {
+    console.warn('[refresh] skipped vm_refresh_all_snapshots(): one or more report/store loads failed.');
+  } else {
+    const t0 = Date.now();
+    try {
+      await refreshSnapshots();
+      console.log(`[refresh] vm_refresh_all_snapshots() ok in ${Date.now() - t0}ms`);
+    } catch (err) {
+      if (err.code === '42883') {
+        // undefined_function — code deployed before the SQL; don't fail the sync.
+        console.warn(
+          '[refresh] WARNING: vm_refresh_all_snapshots() does not exist — run the ' +
+            'snapshot-refresh SQL in the Supabase SQL Editor. Snapshots NOT refreshed.'
+        );
+      } else {
+        refreshFailed = true;
+        console.error(
+          `[FAIL] refresh vm_refresh_all_snapshots() after ${Date.now() - t0}ms: ${err.message}`
+        );
+        summary.push({
+          report: 'vm_refresh_all_snapshots()',
+          store: 'all',
+          week: '-',
+          rows: 0,
+          status: 'refresh-failed',
+          error: err.message,
+        });
+      }
+    }
+  }
+
   await closePool();
 
   // ---- Run summary -------------------------------------------------------
@@ -123,6 +159,10 @@ async function main() {
 
   if (anyFailed) {
     console.error('\nOne or more report/store loads failed. Exiting non-zero.');
+    process.exit(1);
+  }
+  if (refreshFailed) {
+    console.error('\nAll data loaded, but the snapshot refresh failed. Exiting non-zero.');
     process.exit(1);
   }
   console.log('\nAll reports synced successfully.');

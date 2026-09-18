@@ -218,9 +218,20 @@ async function loadStore(table, store, weeksData) {
   }
 }
 
+/**
+ * Refresh the dashboard materialized views (vm_mv_category_quarter_net,
+ * mv_vm_meal_deals) via the DB function vm_refresh_all_snapshots(). Call ONCE,
+ * after every store has loaded — never mid-load, or the snapshots keep partial
+ * totals. Throws on error; the caller decides what that means for the run.
+ */
+async function refreshSnapshots() {
+  await getPool().query('SELECT vm_refresh_all_snapshots()');
+}
+
 module.exports = {
   loadStore,
   closePool,
+  refreshSnapshots,
   // exported for testing
   sanitizeColumn,
   buildColumnMap,
