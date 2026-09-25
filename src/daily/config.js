@@ -65,20 +65,66 @@ require('dotenv').config();
 const { STORES, fmtISO, fmtUK, parseISO, addDays } = require('../config');
 
 // ---------------------------------------------------------------------------
-// The one chart this sync pulls.
+// The charts this sync pulls, one single-day window at a time.
+//
 // `chart` must match the VM Hub "Chart" dropdown CHARACTER-FOR-CHARACTER.
 //
-// Reconciled against the weekly data before being adopted (Peckers Hitchin,
-// week 2026-08-10..2026-08-16): the sum of 7 single-day pulls was 11560.96
-// against 11560.96 already stored by the weekly sync — a 0.00 difference. So
-// this chart really is business-date based at day granularity, and a one-day
-// window is a legitimate slice of the same net-sales number the Executive
-// Dashboard reports (ex-VAT, after discounts and refunds).
 // ---------------------------------------------------------------------------
-const DAILY_REPORT = {
-  chart: 'Gross Sales',
-  table: 'vm_daily_net_sales_raw',
-};
+// EVERY CHART NEEDS ITS OWN TABLE. THIS IS NOT A STYLE CHOICE.
+// ---------------------------------------------------------------------------
+// loadStore() in src/load.js is idempotent by deleting (store, week_start) and
+// re-inserting. `week_start` here is the business date, and it carries NO chart
+// dimension. Two charts sharing one table would therefore delete each other's
+// rows for the same (store, date) on every run, and whichever loaded last would
+// be the only one left. Do not point two entries at the same `table`.
+//
+// ---------------------------------------------------------------------------
+// `critical` — WHAT IT CONTROLS
+// ---------------------------------------------------------------------------
+// Only a critical chart's outcome may move vm_daily_sync_runs.status, because
+// that column is what /api/sauce/health turns into a staleness alarm for the
+// Sauce Management integration. A non-critical chart failing still prints in
+// the run summary, still lands in the ledger's `error` text and still exits
+// non-zero (so the workflow goes red and the SMTP alert fires) — but it must
+// NOT tell Sauce that its own perfectly-good feed has gone stale.
+// ---------------------------------------------------------------------------
+const ALL_DAILY_REPORTS = [
+  // -- The Sauce Management feed. Pre-existing; unchanged. -------------------
+  // Reconciled against the weekly data before being adopted (Peckers Hitchin,
+  // week 2026-08-10..2026-08-16) while it was still 'Net Sales by Channel': the
+  // sum of 7 single-day pulls was 11560.96 against 11560.96 already stored by
+  // the weekly sync — a 0.00 difference. Repointed to 'Gross Sales' on
+  // 2026-08-22; see the pivot note in sql/daily_net_sales.sql.
+  {
+    chart: 'Gross Sales',
+    table: 'vm_daily_net_sales_raw',
+    critical: true,
+    feeds: 'Sauce Management daily feed -> vm_v_daily_net_sales -> /api/sauce/daily-net-sales',
+  },
+
+  // -- Daily NET sales, at hour grain. Added 2026-09-24. ---------------------
+  // Fixes the two dashboards that had to SYNTHESISE a daily net figure by
+  // splitting a week total across Mon–Sun using a GROSS weekday shape (the
+  // Daypart net heat map and the Labour Cost weekday breakdown). See
+  // peckers-cashflow/docs/DAILY_NET_SALES_GAP.md.
+  //
+  // Verified before adoption (scripts/probe-daily-hourly.js, Peckers Stevenage):
+  //   2026-09-18  sum of 12 hour rows = 3530.5100  vs VM Hub 3530.51  (0.00)
+  //   2026-09-16  sum of 11 hour rows = 2094.5717  vs VM Hub 2094.57  (0.00 @2dp)
+  // So a single-day window really does return THAT DAY's hour buckets, and they
+  // sum to the day's net total. One chart therefore serves both the hour grain
+  // and the day grain — there is no need for a second day-total chart.
+  //
+  // The residual sub-penny (2094.5717) is the known sixths-of-a-penny artefact
+  // of item-level VAT removal (gross / 1.2 = x5/6), not a rounding bug. Compare
+  // days at 2dp, never at 4.
+  {
+    chart: 'Net Sales by Hour',
+    table: 'vm_daily_net_sales_by_hour_raw',
+    critical: false,
+    feeds: 'Daypart net heat map + Labour Cost weekday breakdown (peckers-cashflow)',
+  },
+];
 
 function env(name, fallback) {
   const v = process.env[name];
@@ -90,6 +136,46 @@ const DAILY_LOOKBACK_DAYS = Math.max(
   1,
   parseInt(env('DAILY_LOOKBACK_DAYS', '3'), 10) || 3
 );
+
+/**
+ * Narrow the run to specific charts, via DAILY_CHARTS (comma-separated, matched
+ * against `chart` exactly). Unset = every chart in ALL_DAILY_REPORTS.
+ *
+ * This exists for two reasons, both operational:
+ *
+ *  1. BACKFILL. A historical backfill wants ONE chart. Without this filter,
+ *     re-running 28 weeks would also re-pull 'Gross Sales' for ~390 store-days
+ *     and rewrite the table the live Sauce Management feed reads — doubling the
+ *     runtime to achieve something nobody asked for.
+ *
+ *  2. KILL SWITCH. If a newly-added chart starts failing at 00:30, setting
+ *     DAILY_CHARTS='Gross Sales' restores exactly the previous behaviour with
+ *     an env change and no deploy.
+ *
+ * An unknown name throws rather than being ignored: a typo'd chart name that
+ * silently pulled nothing would look like a clean run in the ledger.
+ */
+function selectReports() {
+  const raw = env('DAILY_CHARTS');
+  if (!raw) return ALL_DAILY_REPORTS;
+
+  const wanted = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const known = ALL_DAILY_REPORTS.map((r) => r.chart);
+  const unknown = wanted.filter((w) => !known.includes(w));
+  if (unknown.length) {
+    throw new Error(
+      `DAILY_CHARTS names unknown chart(s): ${unknown.join(', ')}. ` +
+        `Known charts: ${known.join(' | ')}`
+    );
+  }
+  const picked = ALL_DAILY_REPORTS.filter((r) => wanted.includes(r.chart));
+  if (!picked.length) {
+    throw new Error('DAILY_CHARTS is set but selected no charts.');
+  }
+  return picked;
+}
+
+const DAILY_REPORTS = selectReports();
 
 /**
  * Today's calendar date in Europe/London as YYYY-MM-DD.
@@ -172,7 +258,12 @@ function getBusinessDates(now = new Date()) {
 }
 
 module.exports = {
-  DAILY_REPORT,
+  DAILY_REPORTS,
+  // Deprecated single-chart alias, kept so anything still importing the old
+  // name resolves to the Sauce feed rather than to undefined. Nothing in this
+  // repo reads it any more — prefer DAILY_REPORTS.
+  DAILY_REPORT: ALL_DAILY_REPORTS[0],
+  ALL_DAILY_REPORTS,
   DAILY_LOOKBACK_DAYS,
   STORES, // re-exported from src/config.js — the single canonical store list
   getBusinessDates,

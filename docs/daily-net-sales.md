@@ -9,6 +9,21 @@
 > in §9 was only ever run against the old net-sales chart and has **not**
 > been redone for gross sales.
 
+> **2026-09-24 — this sync now pulls a SECOND chart.** `Net Sales by Hour` was
+> added alongside `Gross Sales`, into its own table
+> (`vm_daily_net_sales_by_hour_raw`), to give the dashboards a real daily NET
+> figure instead of one estimated from a gross weekday shape. See
+> **`daily-net-sales-by-hour.md`**.
+>
+> Nothing about the Sauce feed changed: same chart, same table, same view, same
+> routes, pulled first every night. Two things protect it — each chart writes
+> its own table (`loadStore()` refreshes by `(store, week_start)` with no chart
+> dimension, so a shared table would self-destruct), and
+> `vm_daily_sync_runs.status` is now computed from **critical** charts only, so
+> a failing hourly-net pull cannot make `/api/sauce/health` report Sauce's own
+> feed stale. `DAILY_CHARTS='Gross Sales'` restores the exact previous
+> behaviour with no deploy.
+
 One **gross sales** figure per store per business day, pulled from Vita Mojo
 every night and served to the Sauce Management project over HTTP.
 

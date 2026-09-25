@@ -46,6 +46,9 @@ on:
       end_date:
         description: 'Re-run a specific range: last business date (YYYY-MM-DD). Must be set together with start_date.'
         required: false
+      charts:
+        description: 'Restrict to specific charts, comma-separated and matched EXACTLY (e.g. "Gross Sales"). Blank = all. Use "Gross Sales" alone as a kill switch if a newly-added chart starts failing.'
+        required: false
 
 # Never cancel a running daily sync — queue a new one instead. Two concurrent
 # runs would fight over the same VM Hub session.
@@ -62,6 +65,13 @@ jobs:
     # holding a Vita Mojo session when the weekly sync starts at 01:30 UTC.
     # Triggered at 00:30, a hung run is killed at 00:50 with 40 minutes to
     # spare. Do not raise this without moving the cron-job.org schedule too.
+    #
+    # BUDGET, as of 2026-09-24: the run pulls 2 charts x 2 stores x 3 days = 12
+    # browser pulls, up from 6 when only 'Gross Sales' was synced. Measured at
+    # roughly half a minute per pull, that is ~6 min of scraping plus setup —
+    # still comfortably inside 20. If a THIRD chart is ever added, re-measure
+    # before assuming it still fits, because blowing this budget kills the run
+    # and takes the Sauce Management feed stale with it.
     timeout-minutes: 20
 
     env:
@@ -77,6 +87,18 @@ jobs:
       DAILY_START_DATE: ${{ github.event.inputs.start_date || '' }}
       DAILY_END_DATE: ${{ github.event.inputs.end_date || '' }}
       DAILY_LOOKBACK_DAYS: '3'
+      # Blank = every chart in ALL_DAILY_REPORTS (the nightly default).
+      #
+      # Setting this to 'Gross Sales' restores the pre-2026-09-24 behaviour
+      # exactly, from the Actions UI, with no code change and no deploy — the
+      # kill switch if a newly-added chart starts failing at 00:30.
+      #
+      # NOTE: a value that selects no CRITICAL chart writes no
+      # vm_daily_sync_runs row at all, so such a run cannot reset
+      # /api/sauce/health's staleness clock. That is intended for backfills, but
+      # it also means the health check will keep ageing while such a run is the
+      # only thing happening. Do not leave a non-critical-only value set here.
+      DAILY_CHARTS: ${{ github.event.inputs.charts || '' }}
 
     steps:
       - name: Checkout repository
