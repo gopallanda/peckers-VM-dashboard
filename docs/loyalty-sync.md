@@ -38,7 +38,15 @@ Notes per chart:
   balances only match Lifetime's `points_balance` for ~1 in 3, so the two charts
   define "balance" differently — don't mix them.
 - **Loyalty per channel** — values are each channel's **share** (they sum to 1
-  per store-week), not points. Don't sum across stores.
+  per store-week), not points. Don't sum across stores. Channels:
+  `click & collect`, `kiosk`, `own delivery`, `pos`. VM Hub's own query fails
+  (`error_type: invalid-query`) for every store-week in which **no points were
+  redeemed** — confirmed 2026-10-15: each failing week had redeemed = 0 in
+  `vm_loyalty_per_customer`, each loaded week had > 0. Those units are logged
+  as **NO-DATA** (not a failure, not retried, nothing loaded). They can't be
+  rebuilt from `vm_loyalty_per_customer`, which has no `pos` channel. Values like
+  `0E-17` are scientific notation for 0 — `vm_num()` misreads them (as 17), so
+  cast them properly in views.
 - **Discounts Info** — one row per discounted order. It has **no customer id**;
   `order_uuid` joins to `vm_detailed_sales_info.order_uuid` → `customer_id`.
   Its own `store` column lands as `store_2` (see load.js).

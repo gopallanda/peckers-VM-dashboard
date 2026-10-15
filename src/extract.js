@@ -508,6 +508,16 @@ async function applyFilters(page, { report, store, week }) {
 class QueryProcessorError extends Error {}
 
 /**
+ * Thrown (only when the caller opts in via failFastErrorTypes) when Metabase
+ * says the query itself is invalid rather than slow: error_type
+ * "invalid-query". Re-fetching the same token or re-running Update returns the
+ * same error, so it is not worth retrying. Seen on "Loyalty per channel" for
+ * every store-week with zero redemptions (its share-of-redeemed calculation
+ * can't divide by a zero total).
+ */
+class InvalidQueryError extends Error {}
+
+/**
  * Metabase's signed-embed CSV endpoint streams whatever rows it has computed and,
  * when the query processor aborts (heavy-query timeout / OOM), appends a JSON
  * error object as the final line, e.g.
@@ -531,11 +541,20 @@ function looksLikeFailedQuery(raw) {
  *                 giving up (Metabase usually finishes and caches the query).
  *   persist       false = don't write the raw CSV to downloads/. Loyalty CSVs
  *                 carry personal data; the caller writes a stripped copy instead.
+ *   failFastErrorTypes  Metabase error_types that throw InvalidQueryError at
+ *                 once instead of being re-fetched (e.g. ['invalid-query']).
  */
 async function captureViaCsv(
   page,
   tag,
-  { refetches = 2, refetchDelayMs = 6000, timeoutMs = 120000, retryGateway = false, persist = true } = {}
+  {
+    refetches = 2,
+    refetchDelayMs = 6000,
+    timeoutMs = 120000,
+    retryGateway = false,
+    persist = true,
+    failFastErrorTypes = [],
+  } = {}
 ) {
   const embed = findEmbedFrame(page);
   if (!embed) {
@@ -578,6 +597,10 @@ async function captureViaCsv(
     if (/^\s*</.test(text)) {
       console.warn('[extract] CSV endpoint returned HTML (not CSV) — falling back to table scrape.');
       return null;
+    }
+    const errType = (text.match(/"error_type"\s*:\s*"([^"]+)"/) || [])[1];
+    if (errType && failFastErrorTypes.includes(errType)) {
+      throw new InvalidQueryError(`Metabase rejected the query for ${tag} (error_type "${errType}").`);
     }
     if (looksLikeFailedQuery(text)) {
       console.warn(
@@ -723,4 +746,5 @@ module.exports = {
   parseCsvString,
   looksLikeFailedQuery,
   QueryProcessorError,
+  InvalidQueryError,
 };

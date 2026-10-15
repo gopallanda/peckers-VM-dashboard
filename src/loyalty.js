@@ -44,7 +44,12 @@
  *
  * Resumable: each (report, store, week) is its own extract + loadStore()
  * transaction, logged to downloads/loyalty_progress.jsonl. In backfill mode a
- * re-run skips units already logged ok. loadStore() is delete-then-insert per
+ * re-run skips units already logged ok (or no-data, see below).
+ *
+ * NO-DATA: a report flagged invalidQueryMeansNoData (Loyalty per channel) whose
+ * Metabase query is rejected as "invalid-query" — it does that for every
+ * store-week with zero redemptions — is logged as no-data: not a failure, not
+ * retried, nothing loaded. loadStore() is delete-then-insert per
  * (store, week_start), so redoing a unit is always safe, and it never touches a
  * week_start outside the windows of this run.
  *
@@ -77,6 +82,7 @@ const {
   currentEmbedUrl,
   waitForResults,
   captureViaCsv,
+  InvalidQueryError,
 } = require('./extract');
 const { loadStore, closePool } = require('./load');
 
@@ -191,11 +197,23 @@ async function extractLoyalty(page, report, store, week) {
   await waitForResults(page, prevUrl);
 
   const tag = `${report.table}_${store || 'all'}_${week.startISO}`.replace(/[^a-z0-9_]+/gi, '_');
-  const captured = await captureViaCsv(page, tag, {
-    timeoutMs: report.csvTimeoutMs || 120000,
-    retryGateway: true,
-    persist: false,
-  });
+  let captured;
+  try {
+    captured = await captureViaCsv(page, tag, {
+      timeoutMs: report.csvTimeoutMs || 120000,
+      retryGateway: true,
+      persist: false,
+      failFastErrorTypes: ['invalid-query'],
+    });
+  } catch (e) {
+    // The query itself is rejected: re-running it returns the same error, so
+    // never retry (this used to burn 9 fetches and ~3 min per unit).
+    if (e instanceof InvalidQueryError) {
+      e.noRetry = true;
+      e.invalidQuery = true;
+    }
+    throw e;
+  }
   // No DOM-table fallback here: Metabase virtualises rows, so it would load a
   // silent undercount — fail and retry instead.
   if (!captured) throw new Error(`No CSV for ${tag} (endpoint error or HTML response).`);
@@ -287,7 +305,7 @@ function loadDone() {
     if (!line.trim()) continue;
     try {
       const p = JSON.parse(line);
-      if (p.status === 'ok') done.add(unitKey(p.table, p.store, p.week));
+      if (p.status === 'ok' || p.status === 'no-data') done.add(unitKey(p.table, p.store, p.week));
     } catch {
       /* ignore a torn last line after a crash */
     }
@@ -400,8 +418,15 @@ async function main() {
           summary.push({ table: report.table, store: g.store, week: week.startISO, rows: g.rows.length, status: DRY_RUN ? 'dry-run' : 'ok', secs });
         }
       } catch (err) {
-        anyFailed = true;
         const secs = Math.round((Date.now() - u0) / 1000);
+        if (err.invalidQuery && report.invalidQueryMeansNoData) {
+          // Known VM Hub limitation, not a sync failure (see LOYALTY_REPORTS).
+          console.log(`[no-data] ${progress} ${label}: VM Hub cannot compute this chart for the week (${err.message})`);
+          logProgress({ table: report.table, store: where, week: week.startISO, rows: 0, status: 'no-data', error: err.message, secs });
+          summary.push({ table: report.table, store: where, week: week.startISO, rows: 0, status: 'no-data', secs });
+          continue;
+        }
+        anyFailed = true;
         console.error(`[FAIL] ${progress} ${label}: ${err.message}`);
         logProgress({ table: report.table, store: where, week: week.startISO, rows: 0, status: 'failed', error: err.message, secs });
         summary.push({ table: report.table, store: where, week: week.startISO, rows: 0, status: 'failed', error: err.message, secs });

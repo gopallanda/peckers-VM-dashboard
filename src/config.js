@@ -223,6 +223,9 @@ const REPORTS = [
 //             vm_detailed_sales_info.order_uuid -> customer_id). Kept.
 //   dropColumns extra personal-data header regexes on top of LOYALTY_PII_DEFAULT.
 //   csvTimeoutMs per-fetch CSV timeout (core stays at 120s).
+//   invalidQueryMeansNoData  a Metabase "invalid-query" error means "VM Hub has
+//             nothing to report for this store-week" — logged as NO-DATA, not a
+//             failure, and not retried on resume.
 //
 // "Loyalty - Current Balance" is deliberately absent: its CSV has headers but
 // zero rows for every store selection. Balances come from the two charts below.
@@ -254,12 +257,19 @@ const LOYALTY_REPORTS = [
     columns: ['uuid', 'email', 'balance_accrued', 'balance_redeemed', 'current_balance', 'last_activity_date'],
   },
   {
-    // Share of points earnt/redeemed per channel (values sum to 1, not points).
+    // Share of points earnt/redeemed per channel (values sum to 1, not points;
+    // channels: click & collect, kiosk, own delivery, pos). VM Hub's own query
+    // fails with error_type "invalid-query" for every store-week in which no
+    // points were redeemed (seen 2026-04-13..06-01; each failing week had
+    // redeemed = 0 in vm_loyalty_per_customer, every loaded week had > 0).
+    // Those weeks are recorded as 'no-data', not failures, and not retried.
+    // They can't be rebuilt from vm_loyalty_per_customer: it has no 'pos' channel.
     chart: 'Loyalty per channel',
     table: 'vm_loyalty_per_channel',
     kind: 'weekly',
     perStore: true,
     idColumn: null,
+    invalidQueryMeansNoData: true,
     columns: ['channel', 'points_earnt', 'points_redeemed'],
   },
   {
