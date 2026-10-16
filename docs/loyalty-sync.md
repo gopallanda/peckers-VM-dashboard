@@ -48,7 +48,9 @@ Notes per chart:
   `0E-17` are scientific notation for 0 — `vm_num()` misreads them (as 17), so
   cast them properly in views.
 - **Discounts Info** — one row per discounted order. It has **no customer id**;
-  `order_uuid` joins to `vm_detailed_sales_info.order_uuid` → `customer_id`.
+  `order_uuid` joins to `vm_detailed_sales_info.order_uuid` → `customer_id`
+  (7,053 of 7,198 orders match; that table has one row per order *line*, so
+  count `DISTINCT order_uuid`).
   Its own `store` column lands as `store_2` (see load.js).
 - **Lifetime loyalty per customer** — identical output whatever the Stores filter
   says, so it is pulled once and loaded as `'All stores'` (never under both
@@ -82,7 +84,10 @@ removed **before** `loadStore()` — and before anything is written to disk:
   phone/mobile, address/street/postcode/zip, birthday/DOB, marketing/consent/
   opt-in, card/payment tokens) plus each report's `dropColumns`.
 - The Vita Mojo customer/user uuid (or `order_uuid`) is **kept** — pseudonymous,
-  and it is what joins to `vm_detailed_sales_info`.
+  and it is what joins to `vm_detailed_sales_info`. Note the tenant prefix:
+  `vm_detailed_sales_info.customer_id = 'Peckers_' || user_uuid` (a bare
+  `customer_id = user_uuid` matches nothing). Verified 2026-10-16: 2,839 of
+  2,842 `vm_loyalty_per_customer` users match.
 - Columns are removed from `columns` **and** every row; the dropped headers are
   logged per unit and in the run summary.
 - The raw CSV is **never written** (`captureViaCsv(..., { persist: false })`);
