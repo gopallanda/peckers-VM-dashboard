@@ -228,10 +228,22 @@ async function refreshSnapshots() {
   await getPool().query('SELECT vm_refresh_all_snapshots()');
 }
 
+/**
+ * Refresh the loyalty dashboard materialized views (mv_vm_loyalty_rewards_weekly,
+ * mv_vm_loyalty_member_sales) via vm_refresh_loyalty_snapshots(). They read the
+ * loyalty tables AND vm_detailed_sales_info, so call ONCE at the end of the
+ * loyalty step (the workflow runs it after the core sync). Needs the postgres /
+ * service role — EXECUTE is revoked from anon and authenticated. Throws on error.
+ */
+async function refreshLoyaltySnapshots() {
+  await getPool().query('SELECT vm_refresh_loyalty_snapshots()');
+}
+
 module.exports = {
   loadStore,
   closePool,
   refreshSnapshots,
+  refreshLoyaltySnapshots,
   // exported for testing
   sanitizeColumn,
   buildColumnMap,

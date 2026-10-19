@@ -4,7 +4,9 @@
  * loyalty.js
  * ----------
  * Orchestrator for `npm run sync:loyalty` — the LOYALTY reports only
- * (LOYALTY_REPORTS in config.js). No core reports, no snapshot refresh.
+ * (LOYALTY_REPORTS in config.js). No core reports. Ends with ONE call to
+ * vm_refresh_loyalty_snapshots() (the loyalty dashboard views), never the
+ * core vm_refresh_all_snapshots().
  *
  * WHY a separate step and not part of index.js:
  *   index.js skips vm_refresh_all_snapshots() if ANY report fails. These are
@@ -84,7 +86,7 @@ const {
   captureViaCsv,
   InvalidQueryError,
 } = require('./extract');
-const { loadStore, closePool } = require('./load');
+const { loadStore, closePool, refreshLoyaltySnapshots } = require('./load');
 
 const ARGS = process.argv.slice(2);
 const DRY_RUN = ARGS.includes('--dry-run');
@@ -372,6 +374,8 @@ async function main() {
   let anyFailed = false;
   const t0 = Date.now();
 
+  let fatal;
+  try {
   await withSession(async (page) => {
     for (const [i, { report, store, week }] of units.entries()) {
       const where = store || LOYALTY_ALL_STORES;
@@ -433,8 +437,30 @@ async function main() {
       }
     }
   });
+  } catch (err) {
+    // Units loaded before the crash have committed; refresh for them below.
+    fatal = err;
+  }
+
+  // ---- Loyalty snapshot refresh (once per run, after every loyalty load) -----
+  // The views rebuild in full, so this is right after a partial run or a
+  // backfill too. A failure never touches the committed loads; it only makes
+  // the run exit non-zero so it isn't missed.
+  let refresh = null;
+  if (!DRY_RUN) {
+    const r0 = Date.now();
+    try {
+      await refreshLoyaltySnapshots();
+      refresh = { status: 'ok', secs: Math.round((Date.now() - r0) / 1000) };
+      console.log(`[ok]  vm_refresh_loyalty_snapshots ${refresh.secs}s`);
+    } catch (err) {
+      refresh = { status: 'fail', secs: Math.round((Date.now() - r0) / 1000), error: err.message };
+      console.error(`[FAIL] vm_refresh_loyalty_snapshots: ${err.message}`);
+    }
+  }
 
   await closePool();
+  if (fatal) throw fatal;
 
   // ---- Run summary (separate LOYALTY heading) ------------------------------
   const mins = ((Date.now() - t0) / 60000).toFixed(1);
@@ -442,6 +468,13 @@ async function main() {
   for (const s of summary) {
     const tag = s.status.toUpperCase().padEnd(8);
     console.log(`${tag} ${s.table} @ ${s.store} [${s.week}] rows=${s.rows}${s.secs != null ? ` ${s.secs}s` : ''}${s.error ? `  (${s.error})` : ''}`);
+  }
+  if (refresh) {
+    console.log(
+      refresh.status === 'ok'
+        ? `${'OK'.padEnd(8)} vm_refresh_loyalty_snapshots ${refresh.secs}s`
+        : `${'FAIL'.padEnd(8)} vm_refresh_loyalty_snapshots ${refresh.error}`
+    );
   }
   console.log('---------------- personal-data headers dropped -----------');
   for (const r of reports) {
@@ -453,6 +486,10 @@ async function main() {
 
   if (anyFailed) {
     console.error('\nOne or more LOYALTY units failed. Exiting non-zero.');
+    return 1;
+  }
+  if (refresh && refresh.status !== 'ok') {
+    console.error('\nAll loyalty data loaded, but vm_refresh_loyalty_snapshots failed. Exiting non-zero.');
     return 1;
   }
   console.log(`\nLOYALTY step ${DRY_RUN ? 'dry run ' : ''}completed successfully.`);
