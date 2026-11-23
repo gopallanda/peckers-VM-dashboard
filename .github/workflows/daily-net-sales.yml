@@ -59,7 +59,7 @@ concurrency:
 jobs:
   daily:
     name: Daily net sales → Supabase
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # NON-NEGOTIABLE. This is what guarantees the daily run can never still be
     # holding a Vita Mojo session when the weekly sync starts at 01:30 UTC.
