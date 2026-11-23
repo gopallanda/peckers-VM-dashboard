@@ -62,7 +62,7 @@ concurrency:
 jobs:
   sync:
     name: Sync Vita Mojo → Supabase
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 60 for the core sync + 25 for the loyalty step + setup headroom.
     timeout-minutes: 90
 
